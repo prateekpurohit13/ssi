@@ -1,230 +1,65 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  useAccount,
-  useReadContract,
-  useWriteContract,
-  useConfig,
-} from 'wagmi'
-import { waitForTransactionReceipt } from 'wagmi/actions'
-import { isAddress, keccak256, stringToBytes } from 'viem'
-import { contractConfig } from './contract'
-import { uploadToIPFS } from './ipfs'
-import { DashboardHeader } from './components/home/DashboardHeader'
-import { StatsGrid } from './components/home/StatsGrid'
-import { ConnectWalletPrompt } from './components/home/ConnectWalletPrompt'
-import { IssueCredentialSection } from './components/home/IssueCredentialSection'
-import { CredentialsSection } from './components/home/CredentialsSection'
-import { ViewToggle } from './components/home/ViewToggle'
-import type { Credential } from './components/home/types'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useAccount } from 'wagmi'
+import ColorBends from './components/home/ColorBends'
 
 export default function Home() {
   const { address } = useAccount()
-  const config = useConfig()
+  const router = useRouter()
 
-  const { data, refetch } = useReadContract({
-    ...contractConfig,
-    functionName: 'getUserCredentials',
-    args: address ? [address] : undefined,
-  })
-
-  const { writeContractAsync } = useWriteContract()
-
-  const [name, setName] = useState('')
-  const [type, setType] = useState('')
-  const [year, setYear] = useState('')
-  const [recipient, setRecipient] = useState('')
-  const [file, setFile] = useState<File | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const credentials = (data ?? []) as Credential[]
-  const activeCredentials = credentials.filter((cred) => cred.isValid).length
-  const revokedCredentials = credentials.length - activeCredentials
-
-  // ---------------- ISSUE ----------------
-
-  async function handleExtract() {
-    if (!file) {
-      alert('Upload a PDF first')
-      return
+  useEffect(() => {
+    if (address) {
+      router.push('/choose')
     }
-
-    try {
-      setLoading(true)
-
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch('/api/extract', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const result = await res.json()
-
-      if (!res.ok || result.error) {
-        throw new Error(result.error ?? 'Extraction failed')
-      }
-
-      if (!result.data) {
-        alert('Extraction failed')
-        return
-      }
-
-      setName(result.data.name ?? '')
-      setType(result.data.documentType ?? '')
-      setYear(result.data.year ?? '')
-
-      alert('Data extracted successfully!')
-    } catch (err) {
-      console.error(err)
-      alert(err instanceof Error ? err.message : 'Extraction error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleIssue() {
-    if (!address) return
-
-    try {
-      setLoading(true)
-      const targetAddress =
-        recipient && isAddress(recipient)
-          ? (recipient as `0x${string}`)
-          : address
-
-      const credential = {
-        name,
-        type,
-        year,
-        issuedTo: targetAddress,
-        timestamp: new Date().toISOString(),
-      }
-
-      const cid = await uploadToIPFS(credential)
-
-      const hashValue = keccak256(
-        stringToBytes(JSON.stringify(credential))
-      )
-
-      const txHash = await writeContractAsync({
-        ...contractConfig,
-        functionName: 'issueCredential',
-        args: [targetAddress, hashValue, cid],
-      })
-
-      await waitForTransactionReceipt(config, { hash: txHash })
-
-      setName('')
-      setType('')
-      setYear('')
-      setRecipient('')
-      setFile(null)
-
-      await refetch()
-      alert('Credential Issued Successfully!')
-    } catch (err) {
-      console.error(err)
-      alert('Error issuing credential')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ---------------- REVOKE ----------------
-
-  async function handleRevoke(credentialHash: `0x${string}`) {
-    if (!address) return
-
-    try {
-      setLoading(true)
-
-      const txHash = await writeContractAsync({
-        ...contractConfig,
-        functionName: 'revokeCredential',
-        args: [address, credentialHash],
-      })
-
-      await waitForTransactionReceipt(config, { hash: txHash })
-
-      await refetch()
-      alert('Credential Revoked Successfully')
-    } catch (err) {
-      console.error(err)
-      alert('Revoke Failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ---------------- UI ----------------
+  }, [address, router])
 
   return (
-    <div className="min-h-screen bg-lime-100/70 text-slate-900">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <main className="space-y-6">
-          <div className="flex justify-start">
-            <ViewToggle active="issuer" />
+    <div className="relative min-h-screen overflow-hidden bg-transparent text-orange-50">
+      <div className="pointer-events-none absolute inset-0">
+        <ColorBends
+          className="h-full w-full"
+          colors={['#ff9c42', '#ff6d22', '#0a0b10', '#050507']}
+          speed={0.2}
+          noise={0.02}
+          parallax={0.55}
+          mouseInfluence={1.0}
+          warpStrength={1.05}
+          frequency={1.0}
+          autoRotate={0.38}
+          scale={1.2}
+        />
+      </div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,138,51,0.16),transparent_36%),radial-gradient(circle_at_80%_72%,rgba(255,106,0,0.2),transparent_32%),linear-gradient(180deg,rgba(2,2,4,0.62)_0%,rgba(2,2,4,0.72)_100%)]" />
+
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+        <main className="space-y-8">
+          <div className="max-w-3xl">
+            <p className="inline-block rounded-full border border-orange-300/35 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-100/90">
+              NeuralHash SSI
+            </p>
+            <h1 className="mt-6 text-4xl font-black leading-tight text-white sm:text-6xl">
+              Issue and verify trusted credentials
+              <span className="block text-orange-300">with decentralized identity</span>
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm text-orange-100/80 sm:text-base">
+              Create tamper-evident credentials, store proofs on IPFS, and verify authenticity with cryptographic confidence.
+            </p>
           </div>
 
-          <DashboardHeader />
-
-          <section className="paper-grid relative overflow-hidden rounded-3xl border border-slate-300/70 bg-white p-6 shadow-sm sm:p-8">
-            <div className="max-w-2xl">
-              <p className="inline-block rounded-full border border-slate-300 bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
-                NeuralHash Issuer Space
-              </p>
-              <h2 className="mt-4 text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
-                the credential hub
-                <span className="block bg-pink-200/70 px-2 text-slate-900">for modern SSI workflows</span>
-              </h2>
-              <p className="mt-4 text-sm text-slate-600 sm:text-base">
-                Keep issuing, revoking, and sharing verifiable credentials with a clean dashboard flow.
-              </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="scale-[1.04]">
+              <ConnectButton label="Connect Wallet" />
             </div>
+          </div>
 
-            {/* <div className="image-placeholder mt-6 rounded-2xl bg-white/80 p-6 text-center text-sm font-semibold text-slate-500">
-              IMAGE PLACEHOLDER (hero visual over lined background)
-            </div> */}
+          <section className="grid gap-3 text-sm text-orange-100/85 sm:grid-cols-3">
+            <p>Issue credentials securely</p>
+            <p>Store hashes and metadata on-chain + IPFS</p>
+            <p>Verify authenticity in one flow</p>
           </section>
-
-          <StatsGrid
-            walletConnected={Boolean(address)}
-            totalCredentials={credentials.length}
-            activeCredentials={activeCredentials}
-            revokedCredentials={revokedCredentials}
-          />
-
-          {!address ? (
-            <ConnectWalletPrompt />
-          ) : (
-            <>
-              <IssueCredentialSection
-                name={name}
-                type={type}
-                year={year}
-                recipient={recipient}
-                file={file}
-                loading={loading}
-                onNameChange={setName}
-                onTypeChange={setType}
-                onYearChange={setYear}
-                onRecipientChange={setRecipient}
-                onFileChange={setFile}
-                onExtract={handleExtract}
-                onIssue={handleIssue}
-              />
-
-              <CredentialsSection
-                credentials={credentials}
-                address={address}
-                loading={loading}
-                onRevoke={handleRevoke}
-              />
-            </>
-          )}
         </main>
       </div>
     </div>

@@ -8,9 +8,9 @@ function StatCard({
   accent: string
 }) {
   return (
-    <div className={`rounded-3xl border border-slate-300/80 p-4 shadow-sm ${accent}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</p>
-      <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
+    <div className={`rounded-lg border border-orange-400/30 p-4 shadow-[0_10px_28px_rgba(0,0,0,0.35)] ${accent}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-orange-100/70">{label}</p>
+      <p className="mt-2 text-2xl font-black text-orange-50">{value}</p>
     </div>
   )
 }
@@ -31,22 +31,22 @@ export function StatsGrid({
       <StatCard
         label="Wallet"
         value={walletConnected ? 'Connected' : 'Not connected'}
-        accent="bg-pink-100/70"
+        accent="nh-glass"
       />
       <StatCard
         label="Total Credentials"
         value={String(totalCredentials)}
-        accent="bg-sky-100/80"
+        accent="nh-glass"
       />
       <StatCard
         label="Active"
         value={String(activeCredentials)}
-        accent="bg-emerald-100/80"
+        accent="nh-glass"
       />
       <StatCard
         label="Revoked"
         value={String(revokedCredentials)}
-        accent="bg-amber-100/80"
+        accent="nh-glass"
       />
     </div>
   )

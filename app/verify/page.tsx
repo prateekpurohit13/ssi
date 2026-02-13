@@ -8,6 +8,7 @@ import { keccak256, stringToBytes } from 'viem'
 import { useSearchParams } from 'next/navigation'
 import { contractConfig } from '../contract'
 import { ViewToggle } from '../components/home/ViewToggle'
+import ColorBends from '../components/home/ColorBends'
 
 type Credential = {
   ipfsCID: string
@@ -21,7 +22,7 @@ export default function VerifyPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-50 p-6 text-slate-700">
+        <div className="min-h-screen bg-transparent p-6 text-orange-100/80">
           Loading verifier portal...
         </div>
       }
@@ -154,23 +155,39 @@ function VerifyPageContent() {
 
   // ---------------- UI ----------------
   return (
-    <div className="min-h-screen bg-lime-100/70 text-slate-900">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen overflow-hidden bg-transparent text-orange-50">
+      <div className="pointer-events-none absolute inset-0 opacity-75">
+        <ColorBends
+          className="h-full w-full"
+          colors={['#ff9c42', '#ff6d22', '#0a0b10', '#050507']}
+          speed={0.16}
+          noise={0.02}
+          parallax={0.45}
+          mouseInfluence={0.9}
+          warpStrength={1.0}
+          frequency={1.0}
+          autoRotate={0.28}
+          scale={1.2}
+        />
+      </div>
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,2,4,0.72)_0%,rgba(2,2,4,0.84)_100%)]" />
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <main className="space-y-6">
           <div className="flex justify-start">
             <ViewToggle active="verifier" />
           </div>
 
-          <section className="paper-grid relative overflow-hidden rounded-3xl border border-slate-300/70 bg-white p-6 shadow-sm sm:p-8">
+          <section className=" relative overflow-hidden rounded-xl p-6 sm:p-8">
             <div className="max-w-2xl">
-              <p className="inline-block rounded-full border border-slate-300 bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+              <p className="nh-chip inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide">
                 NeuralHash Verifier Space
               </p>
-              <h2 className="mt-4 text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
+              <h2 className="mt-4 text-4xl font-black leading-tight text-orange-50 sm:text-5xl">
                 verify with confidence
-                <span className="block bg-pink-200/70 px-2 text-slate-900">without revealing everything</span>
+                <span className="mt-1  px-2 text-orange-200">without revealing everything</span>
               </h2>
-              <p className="mt-4 text-sm text-slate-600 sm:text-base">
+              <p className="mt-4 text-sm nh-text-muted sm:text-base">
                 Check authenticity and selectively disclose only the data you need.
               </p>
             </div>
@@ -180,24 +197,24 @@ function VerifyPageContent() {
             </div> */}
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+          <section className="nh-panel rounded-lg p-5 sm:p-6">
+            <h2 className="text-2xl font-bold text-orange-50 sm:text-3xl">
               Public Credential Verification
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm nh-text-muted">
               Lookup wallet credentials, verify integrity, and perform selective disclosure.
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
               <input
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 outline-none ring-indigo-500 transition focus:ring-2"
+                className="nh-input w-full rounded-xl px-3 py-2"
                 placeholder="Enter Wallet Address"
                 value={inputAddress}
                 onChange={(e) => setInputAddress(e.target.value)}
               />
 
               <button
-                className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="nh-button-primary rounded-xl px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => fetchCredentials()}
                 disabled={loading}
               >
@@ -207,50 +224,50 @@ function VerifyPageContent() {
           </section>
 
           {verificationResult && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <p className="text-lg font-semibold text-slate-900">Verification Result</p>
-              <p className="mt-2 text-sm text-slate-700">{verificationResult}</p>
+            <section className="nh-panel rounded-lg p-5 sm:p-6">
+              <p className="text-lg font-semibold text-orange-50">Verification Result</p>
+              <p className="mt-2 text-sm text-orange-100/85">{verificationResult}</p>
             </section>
           )}
 
           {disclosedData && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h3 className="text-lg font-semibold text-slate-900">Selectively Disclosed Information</h3>
+            <section className="nh-panel rounded-lg p-5 sm:p-6">
+              <h3 className="text-lg font-semibold text-orange-50">Selectively Disclosed Information</h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Type:</span> {disclosedData.type}
+                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-sm text-orange-100/85">
+                  <span className="font-semibold text-orange-50">Type:</span> {disclosedData.type}
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Year:</span> {disclosedData.year}
+                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-sm text-orange-100/85">
+                  <span className="font-semibold text-orange-50">Year:</span> {disclosedData.year}
                 </div>
               </div>
             </section>
           )}
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <h3 className="text-lg font-semibold text-slate-900">Credential Records</h3>
-            <p className="mt-1 text-sm text-slate-500">Verify cryptographic integrity before accepting any claim.</p>
+          <section className="nh-panel rounded-lg p-5 sm:p-6">
+            <h3 className="text-lg font-semibold text-orange-50">Credential Records</h3>
+            <p className="mt-1 text-sm nh-text-muted">Verify cryptographic integrity before accepting any claim.</p>
 
             {credentials.length === 0 && !loading && (
-              <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+              <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-6 text-sm text-orange-100/70">
                 No credentials found.
               </div>
             )}
 
             <div className="mt-5 space-y-4">
               {credentials.map((cred, index) => (
-                <article key={index} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-                  <div className="space-y-2 text-sm text-slate-700">
+                <article key={index} className="nh-glass rounded-lg border border-orange-400/28 p-5">
+                  <div className="space-y-2 text-sm text-orange-100/85">
                     <p>
-                      <span className="font-semibold text-slate-900">IPFS CID:</span>{' '}
+                      <span className="font-semibold text-orange-50">IPFS CID:</span>{' '}
                       <span className="break-all">{cred.ipfsCID}</span>
                     </p>
                     <p>
-                      <span className="font-semibold text-slate-900">Issuer:</span> <span className="break-all">{cred.issuer}</span>
+                      <span className="font-semibold text-orange-50">Issuer:</span> <span className="break-all">{cred.issuer}</span>
                     </p>
                     <p>
-                      <span className="font-semibold text-slate-900">Status:</span>{' '}
-                      <span className={cred.isValid ? 'font-semibold text-emerald-600' : 'font-semibold text-rose-600'}>
+                      <span className="font-semibold text-orange-50">Status:</span>{' '}
+                      <span className={cred.isValid ? 'font-semibold text-emerald-300' : 'font-semibold text-rose-300'}>
                         {cred.isValid ? 'Active' : 'Revoked'}
                       </span>
                     </p>
@@ -258,14 +275,14 @@ function VerifyPageContent() {
 
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
-                      className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                      className="nh-button-primary rounded-xl px-4 py-2 text-sm font-semibold transition"
                       onClick={() => verifyCredential(index)}
                     >
                       Verify Integrity
                     </button>
 
                     <button
-                      className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-400"
+                      className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold transition"
                       onClick={() => selectiveDisclosure(index)}
                     >
                       Selective Disclosure

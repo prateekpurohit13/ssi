@@ -5,6 +5,9 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 Create a `.env.local` file in `SSI-fe` with one of these Pinata auth options:
 
 ```bash
+# Required for OCR document extraction
+GEMINI_API_KEY=your_gemini_api_key
+
 # Option 1 (recommended)
 PINATA_JWT=your_pinata_jwt
 

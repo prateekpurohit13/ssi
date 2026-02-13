@@ -8,7 +8,7 @@ import {
   useConfig,
 } from 'wagmi'
 import { waitForTransactionReceipt } from 'wagmi/actions'
-import { keccak256, stringToBytes } from 'viem'
+import { isAddress, keccak256, stringToBytes } from 'viem'
 import { contractConfig } from './contract'
 import { uploadToIPFS } from './ipfs'
 import { DashboardHeader } from './components/home/DashboardHeader'
@@ -34,6 +34,8 @@ export default function Home() {
   const [name, setName] = useState('')
   const [type, setType] = useState('')
   const [year, setYear] = useState('')
+  const [recipient, setRecipient] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
 
   const credentials = (data ?? []) as Credential[]
@@ -42,17 +44,62 @@ export default function Home() {
 
   // ---------------- ISSUE ----------------
 
+  async function handleExtract() {
+    if (!file) {
+      alert('Upload a PDF first')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/extract', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await res.json()
+
+      if (!res.ok || result.error) {
+        throw new Error(result.error ?? 'Extraction failed')
+      }
+
+      if (!result.data) {
+        alert('Extraction failed')
+        return
+      }
+
+      setName(result.data.name ?? '')
+      setType(result.data.documentType ?? '')
+      setYear(result.data.year ?? '')
+
+      alert('Data extracted successfully!')
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Extraction error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleIssue() {
     if (!address) return
 
     try {
       setLoading(true)
+      const targetAddress =
+        recipient && isAddress(recipient)
+          ? (recipient as `0x${string}`)
+          : address
 
       const credential = {
         name,
         type,
         year,
-        issuedTo: address,
+        issuedTo: targetAddress,
         timestamp: new Date().toISOString(),
       }
 
@@ -65,7 +112,7 @@ export default function Home() {
       const txHash = await writeContractAsync({
         ...contractConfig,
         functionName: 'issueCredential',
-        args: [address, hashValue, cid],
+        args: [targetAddress, hashValue, cid],
       })
 
       await waitForTransactionReceipt(config, { hash: txHash })
@@ -73,6 +120,8 @@ export default function Home() {
       setName('')
       setType('')
       setYear('')
+      setRecipient('')
+      setFile(null)
 
       await refetch()
       alert('Credential Issued Successfully!')
@@ -156,10 +205,15 @@ export default function Home() {
                 name={name}
                 type={type}
                 year={year}
+                recipient={recipient}
+                file={file}
                 loading={loading}
                 onNameChange={setName}
                 onTypeChange={setType}
                 onYearChange={setYear}
+                onRecipientChange={setRecipient}
+                onFileChange={setFile}
+                onExtract={handleExtract}
                 onIssue={handleIssue}
               />
 

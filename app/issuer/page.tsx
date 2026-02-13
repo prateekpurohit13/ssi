@@ -50,6 +50,7 @@ export default function IssuerPage() {
   const [recipient, setRecipient] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
+  const [revokingCredentialHash, setRevokingCredentialHash] = useState<`0x${string}` | null>(null)
 
   const credentials = (data ?? []) as Credential[]
   const activeCredentials = credentials.filter((cred) => cred.isValid).length
@@ -145,10 +146,10 @@ export default function IssuerPage() {
   }
 
   async function handleRevoke(credentialHash: `0x${string}`) {
-    if (!address) return
+    if (!address || revokingCredentialHash) return
 
     try {
-      setLoading(true)
+      setRevokingCredentialHash(credentialHash)
 
       const txHash = await writeContractAsync({
         ...contractConfig,
@@ -164,7 +165,7 @@ export default function IssuerPage() {
       console.error(err)
       alert('Revoke Failed')
     } finally {
-      setLoading(false)
+      setRevokingCredentialHash(null)
     }
   }
 
@@ -252,7 +253,7 @@ export default function IssuerPage() {
           <CredentialsSection
             credentials={credentials}
             address={address}
-            loading={loading}
+            revokingCredentialHash={revokingCredentialHash}
             onRevoke={handleRevoke}
           />
         </main>

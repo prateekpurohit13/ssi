@@ -4,14 +4,16 @@ import type { Credential } from './types'
 function CredentialCard({
   credential,
   address,
-  loading,
+  revokingCredentialHash,
   onRevoke,
 }: {
   credential: Credential
   address: `0x${string}`
-  loading: boolean
+  revokingCredentialHash: `0x${string}` | null
   onRevoke: (credentialHash: `0x${string}`) => void
 }) {
+  const isProcessing = revokingCredentialHash === credential.credentialHash
+
   return (
     <article className="nh-glass grid gap-5 rounded-lg border border-orange-400/28 p-5 md:grid-cols-[1fr_auto]">
       <div className="space-y-2 text-sm text-orange-100/85">
@@ -54,9 +56,9 @@ function CredentialCard({
           <button
             className="mt-3 rounded-xl border border-rose-300/30 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => onRevoke(credential.credentialHash)}
-            disabled={loading}
+            disabled={Boolean(revokingCredentialHash)}
           >
-            {loading ? 'Processing...' : 'Revoke Credential'}
+            {isProcessing ? 'Processing...' : 'Revoke Credential'}
           </button>
         )}
       </div>
@@ -83,12 +85,12 @@ function CredentialCard({
 export function CredentialsSection({
   credentials,
   address,
-  loading,
+  revokingCredentialHash,
   onRevoke,
 }: {
   credentials: Credential[]
   address: `0x${string}`
-  loading: boolean
+  revokingCredentialHash: `0x${string}` | null
   onRevoke: (credentialHash: `0x${string}`) => void
 }) {
   return (
@@ -110,7 +112,7 @@ export function CredentialsSection({
             key={index}
             credential={credential}
             address={address}
-            loading={loading}
+            revokingCredentialHash={revokingCredentialHash}
             onRevoke={onRevoke}
           />
         ))}

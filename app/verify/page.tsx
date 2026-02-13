@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { Suspense } from 'react'
 import { useState, useEffect } from 'react'
 import { readContract } from 'wagmi/actions'
@@ -8,6 +7,7 @@ import { useConfig } from 'wagmi'
 import { keccak256, stringToBytes } from 'viem'
 import { useSearchParams } from 'next/navigation'
 import { contractConfig } from '../contract'
+import { ViewToggle } from '../components/home/ViewToggle'
 
 type Credential = {
   ipfsCID: string
@@ -154,33 +154,32 @@ function VerifyPageContent() {
 
   // ---------------- UI ----------------
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <aside className="hidden w-64 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600">
-              NeuralHash
-            </p>
-            <h1 className="mt-2 text-2xl font-bold text-slate-900">Verifier Hub</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Validate authenticity and disclose only required fields.
-            </p>
+    <div className="min-h-screen bg-lime-100/70 text-slate-900">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <main className="space-y-6">
+          <div className="flex justify-start">
+            <ViewToggle active="verifier" />
           </div>
 
-          <nav className="mt-8 space-y-2 text-sm font-medium">
-            <Link
-              href="/"
-              className="flex items-center rounded-xl px-4 py-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              Issuer Dashboard
-            </Link>
-            <span className="flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-white">
-              Verifier Portal
-            </span>
-          </nav>
-        </aside>
+          <section className="paper-grid relative overflow-hidden rounded-3xl border border-slate-300/70 bg-white p-6 shadow-sm sm:p-8">
+            <div className="max-w-2xl">
+              <p className="inline-block rounded-full border border-slate-300 bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                NeuralHash Verifier Space
+              </p>
+              <h2 className="mt-4 text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
+                verify with confidence
+                <span className="block bg-pink-200/70 px-2 text-slate-900">without revealing everything</span>
+              </h2>
+              <p className="mt-4 text-sm text-slate-600 sm:text-base">
+                Check authenticity and selectively disclose only the data you need.
+              </p>
+            </div>
 
-        <main className="flex-1 space-y-6">
+            {/* <div className="image-placeholder mt-6 rounded-2xl bg-white/80 p-6 text-center text-sm font-semibold text-slate-500">
+              IMAGE PLACEHOLDER (verification hero visual over lined background)
+            </div> */}
+          </section>
+
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
               Public Credential Verification

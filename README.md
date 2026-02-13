@@ -2,6 +2,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Create a `.env.local` file in `SSI-fe` with one of these Pinata auth options:
+
+```bash
+# Option 1 (recommended)
+PINATA_JWT=your_pinata_jwt
+
+# Option 2
+PINATA_API_KEY=your_pinata_api_key
+PINATA_SECRET_API_KEY=your_pinata_secret_api_key
+```
+
 First, run the development server:
 
 ```bash

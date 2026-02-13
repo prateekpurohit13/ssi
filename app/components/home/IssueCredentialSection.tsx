@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+
 export function IssueCredentialSection({
   name,
   type,
@@ -27,6 +29,14 @@ export function IssueCredentialSection({
   onExtract: () => void
   onIssue: () => void
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!file && fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [file])
+
   return (
     <section className="nh-panel rounded-lg p-5 sm:p-6">
       <h3 className="text-lg font-semibold text-orange-50">Issue Credential</h3>
@@ -37,6 +47,7 @@ export function IssueCredentialSection({
       <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-4">
         <p className="text-sm font-semibold text-orange-100">Auto-fill from PDF</p>
         <input
+          ref={fileInputRef}
           type="file"
           accept="application/pdf"
           className="nh-input mt-3 block w-full rounded-xl px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-orange-500/20 file:px-3 file:py-1.5 file:font-semibold file:text-orange-100 hover:file:bg-orange-500/30"

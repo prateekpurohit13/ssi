@@ -7,6 +7,7 @@ export function IssueCredentialSection({
   recipient,
   file,
   loading,
+  authenticating,
   onNameChange,
   onTypeChange,
   onYearChange,
@@ -21,6 +22,7 @@ export function IssueCredentialSection({
   recipient: string
   file: File | null
   loading: boolean
+  authenticating: boolean
   onNameChange: (value: string) => void
   onTypeChange: (value: string) => void
   onYearChange: (value: string) => void
@@ -56,7 +58,7 @@ export function IssueCredentialSection({
         <button
           className="nh-button-secondary mt-3 w-full rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onExtract}
-          disabled={loading || !file}
+          disabled={loading || authenticating || !file}
         >
           {loading ? 'Extracting...' : 'Extract Data from PDF'}
         </button>
@@ -107,9 +109,9 @@ export function IssueCredentialSection({
       <button
         className="nh-button-primary mt-5 rounded-xl px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onIssue}
-        disabled={loading}
+        disabled={loading || authenticating}
       >
-        {loading ? 'Processing...' : 'Issue Credential'}
+        {authenticating ? 'Authenticating...' : loading ? 'Processing...' : 'Issue Credential'}
       </button>
     </section>
   )

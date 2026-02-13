@@ -5,14 +5,17 @@ function CredentialCard({
   credential,
   address,
   revokingCredentialHash,
+  authenticatingCredentialHash,
   onRevoke,
 }: {
   credential: Credential
   address: `0x${string}`
   revokingCredentialHash: `0x${string}` | null
+  authenticatingCredentialHash: `0x${string}` | null
   onRevoke: (credentialHash: `0x${string}`) => void
 }) {
   const isProcessing = revokingCredentialHash === credential.credentialHash
+  const isAuthenticating = authenticatingCredentialHash === credential.credentialHash
 
   return (
     <article className="nh-glass grid gap-5 rounded-lg border border-orange-400/28 p-5 md:grid-cols-[1fr_auto]">
@@ -56,9 +59,9 @@ function CredentialCard({
           <button
             className="mt-3 rounded-xl border border-rose-300/30 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => onRevoke(credential.credentialHash)}
-            disabled={Boolean(revokingCredentialHash)}
+            disabled={Boolean(revokingCredentialHash) || Boolean(authenticatingCredentialHash)}
           >
-            {isProcessing ? 'Processing...' : 'Revoke Credential'}
+            {isProcessing ? 'Processing...' : isAuthenticating ? 'Authenticating...' : 'Revoke Credential'}
           </button>
         )}
       </div>
@@ -86,11 +89,13 @@ export function CredentialsSection({
   credentials,
   address,
   revokingCredentialHash,
+  authenticatingCredentialHash,
   onRevoke,
 }: {
   credentials: Credential[]
   address: `0x${string}`
   revokingCredentialHash: `0x${string}` | null
+  authenticatingCredentialHash: `0x${string}` | null
   onRevoke: (credentialHash: `0x${string}`) => void
 }) {
   return (
@@ -113,6 +118,7 @@ export function CredentialsSection({
             credential={credential}
             address={address}
             revokingCredentialHash={revokingCredentialHash}
+            authenticatingCredentialHash={authenticatingCredentialHash}
             onRevoke={onRevoke}
           />
         ))}

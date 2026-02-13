@@ -12,6 +12,7 @@ import {
 import { waitForTransactionReceipt } from 'wagmi/actions'
 import { isAddress, keccak256, stringToBytes } from 'viem'
 import { contractConfig } from '../contract'
+import { authenticateWithBiometric } from '../biometricAuth'
 import { uploadToIPFS } from '../ipfs'
 import { DashboardHeader } from '../components/home/DashboardHeader'
 import { StatsGrid } from '../components/home/StatsGrid'
@@ -51,6 +52,8 @@ export default function IssuerPage() {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [revokingCredentialHash, setRevokingCredentialHash] = useState<`0x${string}` | null>(null)
+  const [authenticatingIssue, setAuthenticatingIssue] = useState(false)
+  const [authenticatingRevokeHash, setAuthenticatingRevokeHash] = useState<`0x${string}` | null>(null)
 
   const credentials = (data ?? []) as Credential[]
   const activeCredentials = credentials.filter((cred) => cred.isValid).length
@@ -98,7 +101,24 @@ export default function IssuerPage() {
   }
 
   async function handleIssue() {
-    if (!address) return
+    if (
+      !address ||
+      loading ||
+      authenticatingIssue ||
+      Boolean(authenticatingRevokeHash) ||
+      Boolean(revokingCredentialHash)
+    ) {
+      return
+    }
+
+    setAuthenticatingIssue(true)
+    const biometricResult = await authenticateWithBiometric(address)
+    setAuthenticatingIssue(false)
+
+    if (!biometricResult.ok) {
+      alert(biometricResult.message)
+      return
+    }
 
     try {
       setLoading(true)
@@ -146,7 +166,24 @@ export default function IssuerPage() {
   }
 
   async function handleRevoke(credentialHash: `0x${string}`) {
-    if (!address || revokingCredentialHash) return
+    if (
+      !address ||
+      loading ||
+      authenticatingIssue ||
+      Boolean(authenticatingRevokeHash) ||
+      Boolean(revokingCredentialHash)
+    ) {
+      return
+    }
+
+    setAuthenticatingRevokeHash(credentialHash)
+    const biometricResult = await authenticateWithBiometric(address)
+    setAuthenticatingRevokeHash(null)
+
+    if (!biometricResult.ok) {
+      alert(biometricResult.message)
+      return
+    }
 
     try {
       setRevokingCredentialHash(credentialHash)
@@ -166,6 +203,7 @@ export default function IssuerPage() {
       alert('Revoke Failed')
     } finally {
       setRevokingCredentialHash(null)
+      setAuthenticatingRevokeHash(null)
     }
   }
 
@@ -241,6 +279,7 @@ export default function IssuerPage() {
             recipient={recipient}
             file={file}
             loading={loading}
+            authenticating={authenticatingIssue}
             onNameChange={setName}
             onTypeChange={setType}
             onYearChange={setYear}
@@ -254,6 +293,7 @@ export default function IssuerPage() {
             credentials={credentials}
             address={address}
             revokingCredentialHash={revokingCredentialHash}
+            authenticatingCredentialHash={authenticatingRevokeHash}
             onRevoke={handleRevoke}
           />
         </main>

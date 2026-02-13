@@ -7,6 +7,7 @@ import { useConfig } from 'wagmi'
 import { keccak256, stringToBytes } from 'viem'
 import { useSearchParams } from 'next/navigation'
 import { contractConfig } from '../contract'
+import { authenticateWithBiometric } from '../biometricAuth'
 import { ViewToggle } from '../components/home/ViewToggle'
 import ColorBends from '../components/home/ColorBends'
 
@@ -16,6 +17,11 @@ type Credential = {
   isValid: boolean
   issuedAt: bigint
   credentialHash: `0x${string}`
+}
+
+type DisclosedData = {
+  type?: string
+  year?: string
 }
 
 export default function VerifyPage() {
@@ -39,11 +45,12 @@ function VerifyPageContent() {
   const userParam = searchParams.get('user')
   const hashParam = searchParams.get('hash')
 
-  const [disclosedData, setDisclosedData] = useState<any>(null)
+  const [disclosedData, setDisclosedData] = useState<DisclosedData | null>(null)
   const [inputAddress, setInputAddress] = useState('')
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [verificationResult, setVerificationResult] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [biometricLoading, setBiometricLoading] = useState(false)
 
   // ---------------- AUTO FILL ADDRESS ----------------
   useEffect(() => {
@@ -99,7 +106,7 @@ function VerifyPageContent() {
   // ---------------- VERIFY ----------------
   async function verifyCredential(
     index: number,
-    credsOverride?: any[]
+    credsOverride?: Credential[]
   ) {
     const creds = credsOverride || credentials
     const cred = creds[index]
@@ -132,8 +139,33 @@ function VerifyPageContent() {
     }
   }
 
+  async function authenticateBiometric() {
+    setBiometricLoading(true)
+
+    try {
+      const result = await authenticateWithBiometric(inputAddress || 'neuralhash-verifier')
+      if (!result.ok) {
+        alert(result.message)
+        return false
+      }
+
+      return true
+    } catch (err) {
+      console.error(err)
+      alert('Biometric authentication failed.')
+      return false
+    } finally {
+      setBiometricLoading(false)
+    }
+  }
+
   // ---------------- SELECTIVE DISCLOSURE ----------------
   async function selectiveDisclosure(index: number) {
+    const isAuthenticated = await authenticateBiometric()
+    if (!isAuthenticated) {
+      return
+    }
+
     const cred = credentials[index]
 
     try {
@@ -247,6 +279,7 @@ function VerifyPageContent() {
           <section className="nh-panel rounded-lg p-5 sm:p-6">
             <h3 className="text-lg font-semibold text-orange-50">Credential Records</h3>
             <p className="mt-1 text-sm nh-text-muted">Verify cryptographic integrity before accepting any claim.</p>
+            <p className="mt-1 text-xs text-orange-100/70">Selective disclosure requires biometric authentication.</p>
 
             {credentials.length === 0 && !loading && (
               <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-6 text-sm text-orange-100/70">
@@ -284,8 +317,9 @@ function VerifyPageContent() {
                     <button
                       className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold transition"
                       onClick={() => selectiveDisclosure(index)}
+                      disabled={biometricLoading}
                     >
-                      Selective Disclosure
+                      {biometricLoading ? 'Authenticating...' : 'Selective Disclosure'}
                     </button>
                   </div>
                 </article>

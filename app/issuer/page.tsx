@@ -12,6 +12,7 @@ import {
 import { waitForTransactionReceipt } from 'wagmi/actions'
 import { isAddress, keccak256, stringToBytes } from 'viem'
 import { contractConfig } from '../contract'
+import { trustRegistryConfig } from '../trustRegistry'
 import { authenticateWithBiometric } from '../biometricAuth'
 import { uploadToIPFS } from '../ipfs'
 import { DashboardHeader } from '../components/home/DashboardHeader'
@@ -37,6 +38,15 @@ export default function IssuerPage() {
   const { data, refetch } = useReadContract({
     ...contractConfig,
     functionName: 'getUserCredentials',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(address),
+    },
+  })
+
+  const { data: trustStatus, isLoading: trustLoading } = useReadContract({
+    ...trustRegistryConfig,
+    functionName: 'isTrusted',
     args: address ? [address] : undefined,
     query: {
       enabled: Boolean(address),
@@ -236,6 +246,15 @@ export default function IssuerPage() {
           </div>
 
           <DashboardHeader />
+
+          <section className="nh-panel rounded-lg p-4 sm:p-5">
+            <p className="text-sm font-semibold text-orange-50">Trust Registry</p>
+            <p className="mt-1 text-sm text-orange-100/80">
+              {trustLoading
+                ? 'Checking issuer trust status...'
+                : `Current issuer status: ${trustStatus ? 'Trusted ✅' : 'Not Trusted ❌'}`}
+            </p>
+          </section>
 
           <section className=" relative overflow-hidden rounded-xl px-6 pb-6 pt-2 sm:px-6 sm:pb-6 sm:pt-2">
             <div className="flex items-start justify-between gap-4">

@@ -7,6 +7,7 @@ import { useConfig, useDisconnect } from 'wagmi'
 import { keccak256, stringToBytes } from 'viem'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { contractConfig } from '../contract'
+import { trustRegistryConfig } from '../trustRegistry'
 import { authenticateWithBiometric } from '../biometricAuth'
 import { ViewToggle } from '../components/home/ViewToggle'
 import ColorBends from '../components/home/ColorBends'
@@ -19,10 +20,7 @@ type Credential = {
   credentialHash: `0x${string}`
 }
 
-type DisclosedData = {
-  type?: string
-  year?: string
-}
+type DisclosedData = Record<string, unknown>
 
 export default function VerifyPage() {
   return (
@@ -50,9 +48,43 @@ function VerifyPageContent() {
   const [disclosedData, setDisclosedData] = useState<DisclosedData | null>(null)
   const [inputAddress, setInputAddress] = useState('')
   const [credentials, setCredentials] = useState<Credential[]>([])
+  const [issuerTrustMap, setIssuerTrustMap] = useState<Record<string, boolean>>({})
   const [verificationResult, setVerificationResult] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [biometricLoading, setBiometricLoading] = useState(false)
+
+  async function checkIssuerTrust(issuer: `0x${string}`) {
+    try {
+      const trusted = await readContract(config, {
+        ...trustRegistryConfig,
+        functionName: 'isTrusted',
+        args: [issuer],
+      })
+
+      return Boolean(trusted)
+    } catch (err) {
+      console.error(err)
+      return false
+    }
+  }
+
+  async function resolveIssuerTrust(creds: Credential[]) {
+    if (!creds.length) {
+      setIssuerTrustMap({})
+      return
+    }
+
+    const issuers = Array.from(new Set(creds.map((cred) => cred.issuer.toLowerCase()))) as `0x${string}`[]
+
+    const entries = await Promise.all(
+      issuers.map(async (issuer) => {
+        const trusted = await checkIssuerTrust(issuer)
+        return [issuer, trusted] as const
+      })
+    )
+
+    setIssuerTrustMap(Object.fromEntries(entries))
+  }
 
   // ---------------- AUTO FILL ADDRESS ----------------
   useEffect(() => {
@@ -79,6 +111,7 @@ function VerifyPageContent() {
 
       const creds = data as Credential[]
       setCredentials(creds)
+      await resolveIssuerTrust(creds)
 
       // 🔥 AUTO VERIFY IF HASH PROVIDED
       if (hashParam) {
@@ -129,10 +162,15 @@ function VerifyPageContent() {
         stringToBytes(JSON.stringify(json))
       )
 
+      const isIssuerTrusted = await checkIssuerTrust(cred.issuer)
+      const trustMessage = isIssuerTrusted
+        ? 'Issuer is trusted ✅'
+        : 'Issuer is not trusted ❌'
+
       if (recomputedHash === cred.credentialHash) {
-        setVerificationResult('✅ Credential Verified (Authentic)')
+        setVerificationResult(`✅ Credential Verified (Authentic) | ${trustMessage}`)
       } else {
-        setVerificationResult('❌ Credential Tampered')
+        setVerificationResult(`❌ Credential Tampered | ${trustMessage}`)
       }
 
     } catch (err) {
@@ -176,11 +214,23 @@ function VerifyPageContent() {
       )
 
       const json = await res.json()
+      const credentialData = json?.credential ?? json
 
-      setDisclosedData({
-        type: json.type,
-        year: json.year,
+      if (!credentialData || typeof credentialData !== 'object') {
+        setDisclosedData({})
+        return
+      }
+
+      const filteredEntries = Object.entries(credentialData as Record<string, unknown>).filter(
+        ([key]) => key !== 'issuedTo' && key !== 'timestamp'
+      )
+
+      const dynamicFields: DisclosedData = {}
+      filteredEntries.forEach(([key, value]) => {
+        dynamicFields[key] = value
       })
+
+      setDisclosedData(dynamicFields)
 
     } catch (err) {
       console.error(err)
@@ -282,12 +332,14 @@ function VerifyPageContent() {
             <section className="nh-panel rounded-lg p-5 sm:p-6">
               <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Selectively Disclosed Information</h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
-                  <span className="font-semibold text-orange-50">Type:</span> {disclosedData.type}
-                </div>
-                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
-                  <span className="font-semibold text-orange-50">Year:</span> {disclosedData.year}
-                </div>
+                {Object.entries(disclosedData).map(([key, value]) => (
+                  <div key={key} className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
+                    <span className="font-semibold capitalize text-orange-50">{key}:</span>{' '}
+                    {typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+                      ? String(value)
+                      : JSON.stringify(value)}
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -313,6 +365,18 @@ function VerifyPageContent() {
                     </p>
                     <p>
                       <span className="font-semibold text-orange-50">Issuer:</span> <span className="break-all">{cred.issuer}</span>
+                    </p>
+                    <p>
+                      <span className="font-semibold text-orange-50">Trust:</span>{' '}
+                      <span
+                        className={
+                          issuerTrustMap[cred.issuer.toLowerCase()]
+                            ? 'font-semibold text-emerald-300'
+                            : 'font-semibold text-rose-300'
+                        }
+                      >
+                        {issuerTrustMap[cred.issuer.toLowerCase()] ? 'Trusted ✅' : 'Not Trusted ❌'}
+                      </span>
                     </p>
                     <p>
                       <span className="font-semibold text-orange-50">Status:</span>{' '}

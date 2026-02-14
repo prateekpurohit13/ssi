@@ -4,6 +4,10 @@ type BiometricAuthResult =
 
 const BIOMETRIC_CREDENTIAL_KEY = 'nh-biometric-credential-id'
 
+function getCredentialStorageKey(userHint: string) {
+  return `${BIOMETRIC_CREDENTIAL_KEY}:${(userHint || 'default').toLowerCase()}`
+}
+
 function createChallenge() {
   return crypto.getRandomValues(new Uint8Array(32))
 }
@@ -24,13 +28,31 @@ function fromBase64Url(value: string) {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0))
 }
 
+function hasUserVerification(authenticatorData: ArrayBuffer) {
+  const bytes = new Uint8Array(authenticatorData)
+  if (bytes.length < 33) {
+    return false
+  }
+
+  const flags = bytes[32]
+  return (flags & 0x04) !== 0
+}
+
 export async function authenticateWithBiometric(userHint: string): Promise<BiometricAuthResult> {
   if (typeof PublicKeyCredential === 'undefined' || !navigator.credentials) {
     return { ok: false, message: 'Biometric authentication is not supported on this browser/device.' }
   }
 
   try {
-    let credentialId = localStorage.getItem(BIOMETRIC_CREDENTIAL_KEY)
+    const canUsePlatformAuthenticator =
+      await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+
+    if (!canUsePlatformAuthenticator) {
+      return { ok: false, message: 'No platform biometric authenticator is available on this device.' }
+    }
+
+    const storageKey = getCredentialStorageKey(userHint)
+    let credentialId = localStorage.getItem(storageKey)
 
     if (!credentialId) {
       const registration = await navigator.credentials.create({
@@ -61,18 +83,21 @@ export async function authenticateWithBiometric(userHint: string): Promise<Biome
       }
 
       credentialId = toBase64Url(registration.rawId)
-      localStorage.setItem(BIOMETRIC_CREDENTIAL_KEY, credentialId)
+      localStorage.setItem(storageKey, credentialId)
     }
 
     const assertion = await navigator.credentials.get({
+      mediation: 'required',
       publicKey: {
         challenge: createChallenge(),
         allowCredentials: [
           {
             type: 'public-key',
             id: fromBase64Url(credentialId),
+            transports: ['internal'],
           },
         ],
+        rpId: window.location.hostname,
         userVerification: 'required',
         timeout: 60000,
       },
@@ -82,10 +107,23 @@ export async function authenticateWithBiometric(userHint: string): Promise<Biome
       return { ok: false, message: 'Biometric authentication was cancelled.' }
     }
 
+    if (!(assertion instanceof PublicKeyCredential)) {
+      return { ok: false, message: 'Unexpected credential response during biometric authentication.' }
+    }
+
+    const assertionResponse = assertion.response
+    if (!(assertionResponse instanceof AuthenticatorAssertionResponse)) {
+      return { ok: false, message: 'Invalid biometric assertion response.' }
+    }
+
+    if (!hasUserVerification(assertionResponse.authenticatorData)) {
+      return { ok: false, message: 'Biometric user verification was not satisfied.' }
+    }
+
     return { ok: true }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'InvalidStateError') {
-      localStorage.removeItem(BIOMETRIC_CREDENTIAL_KEY)
+      localStorage.removeItem(getCredentialStorageKey(userHint))
       return { ok: false, message: 'Biometric profile reset. Please retry biometric auth.' }
     }
 

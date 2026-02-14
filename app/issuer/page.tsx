@@ -37,7 +37,6 @@ type ClaimRequestTuple = readonly [
   bigint,
   `0x${string}`,
   `0x${string}`,
-  readonly string[],
   string,
   boolean,
   bigint,
@@ -576,14 +575,17 @@ export default function IssuerPage() {
             </p>
 
             <div className="mt-5 space-y-3">
-              <input
-                className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
-                placeholder="Target Wallet Address"
-                value={hubTargetAddress}
-                onChange={(event) => setHubTargetAddress(event.target.value)}
-              />
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
+                <input
+                  className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
+                  placeholder="Target Wallet Address"
+                  value={hubTargetAddress}
+                  onChange={(event) => setHubTargetAddress(event.target.value)}
+                />
+                <div className="hidden md:block" />
+              </div>
 
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
                 <input
                   className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
                   placeholder="Claim Reason"
@@ -592,7 +594,7 @@ export default function IssuerPage() {
                 />
                 <button
                   type="button"
-                  className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleClaimRequest}
                   disabled={claimLoading || attestationLoading}
                 >
@@ -600,7 +602,7 @@ export default function IssuerPage() {
                 </button>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
                 <input
                   className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
                   placeholder="Attestation Text"
@@ -609,7 +611,7 @@ export default function IssuerPage() {
                 />
                 <button
                   type="button"
-                  className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleAttestation}
                   disabled={claimLoading || attestationLoading}
                 >
@@ -629,8 +631,8 @@ export default function IssuerPage() {
                   requests.map((req, index) => (
                     <div key={`${req[0].toString()}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
                       <p>Requester: {req[1]}</p>
-                      <p>Purpose: {req[4]}</p>
-                      <p>Status: {req[5] ? 'Fulfilled' : 'Pending'}</p>
+                      <p>Purpose: {req[3]}</p>
+                      <p>Status: {req[4] ? 'Fulfilled' : 'Pending'}</p>
                     </div>
                   ))
                 )}

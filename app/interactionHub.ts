@@ -45,7 +45,6 @@ export const interactionHubConfig = {
         { type: "uint256" }, // id
         { type: "address" }, // requester
         { type: "address" }, // subject
-        { type: "string[]" }, // fields
         { type: "string" }, // purpose
         { type: "bool" }, // fulfilled
         { type: "uint256" } // createdAt

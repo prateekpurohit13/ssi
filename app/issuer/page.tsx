@@ -19,7 +19,7 @@ import { contractConfig } from '../contract'
 import { trustRegistryConfig } from '../trustRegistry'
 import { interactionHubConfig } from '../interactionHub'
 import { authenticateWithBiometric } from '../biometricAuth'
-import { uploadToIPFS } from '../ipfs'
+import { uploadFileToIPFS, uploadToIPFS } from '../ipfs'
 import { DashboardHeader } from '../components/home/DashboardHeader'
 import { StatsGrid } from '../components/home/StatsGrid'
 import { IssueCredentialSection } from '../components/home/IssueCredentialSection'
@@ -174,6 +174,36 @@ export default function IssuerPage() {
   const activeCredentials = credentials.filter((cred) => cred.isValid).length
   const revokedCredentials = credentials.length - activeCredentials
 
+  async function setLatestIssuanceFromTx(txHash: `0x${string}`) {
+    const receipt = await waitForTransactionReceipt(config, { hash: txHash })
+
+    const currentBlockNumber = publicClient
+      ? await publicClient.getBlockNumber()
+      : receipt.blockNumber
+    const block = publicClient
+      ? await publicClient.getBlock({ blockNumber: receipt.blockNumber })
+      : null
+
+    const effectiveGasPrice = receipt.effectiveGasPrice ?? BigInt(0)
+    const gasUsed = receipt.gasUsed
+    const ethSpent = gasUsed * effectiveGasPrice
+    const confirmations =
+      currentBlockNumber >= receipt.blockNumber
+        ? currentBlockNumber - receipt.blockNumber + BigInt(1)
+        : BigInt(1)
+
+    setLatestIssuanceTx({
+      hash: txHash,
+      blockNumber: receipt.blockNumber,
+      confirmations,
+      blockHash: receipt.blockHash,
+      timestamp: block?.timestamp ?? BigInt(Math.floor(Date.now() / 1000)),
+      gasUsed,
+      effectiveGasPrice,
+      ethSpent,
+    })
+  }
+
   async function handleExtract() {
     if (!file) {
       toast.info('Upload a PDF first')
@@ -273,12 +303,19 @@ export default function IssuerPage() {
     try {
       setLoading(true)
 
+      let documentCid: string | undefined
+      if (file) {
+        documentCid = await uploadFileToIPFS(file)
+      }
+
       const credential = {
         name,
         type,
         year,
         issuedTo: targetAddress,
         timestamp: new Date().toISOString(),
+        documentCid,
+        selectedFields,
       }
 
       if (!batchMode) {
@@ -294,7 +331,7 @@ export default function IssuerPage() {
           args: [targetAddress as `0x${string}`, hashValue, cid],
         })
 
-        await waitForTransactionReceipt(config, { hash: txHash })
+        await setLatestIssuanceFromTx(txHash)
         await refetch()
         alert('Single Credential Issued')
         return
@@ -337,7 +374,7 @@ export default function IssuerPage() {
         args: [targetAddress as `0x${string}`, root as `0x${string}`, batchCID],
       })
 
-      await waitForTransactionReceipt(config, { hash: txHash })
+      await setLatestIssuanceFromTx(txHash)
       await refetch()
 
       alert('Merkle Batch Root Anchored On-Chain')
@@ -596,7 +633,6 @@ export default function IssuerPage() {
           </div>
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,4.2fr)_minmax(200px,1fr)]">
-
             <IssueCredentialSection
               selectedDocumentType={selectedDocumentType}
               documentTypeOptions={DOCUMENT_TYPE_OPTIONS}
@@ -699,111 +735,6 @@ export default function IssuerPage() {
               </div>
             )}
           </section>
-
-          <section className="nh-panel rounded-md p-5 sm:p-6">
-            <h3 className="text-lg font-semibold text-orange-50">Interaction Hub</h3>
-            <p className="mt-1 text-sm nh-text-muted">
-              Create claim requests and attestations for a target wallet.
-            </p>
-
-            <div className="mt-5 space-y-3">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
-                <input
-                  className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
-                  placeholder="Target Wallet Address"
-                  value={hubTargetAddress}
-                  onChange={(event) => setHubTargetAddress(event.target.value)}
-                />
-                <div className="hidden md:block" />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
-                <input
-                  className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
-                  placeholder="Claim Reason"
-                  value={claimReason}
-                  onChange={(event) => setClaimReason(event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={handleClaimRequest}
-                  disabled={claimLoading || attestationLoading}
-                >
-                  {claimLoading ? 'Sending...' : 'Send Claim Request'}
-                </button>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
-                <input
-                  className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
-                  placeholder="Attestation Text"
-                  value={attestationText}
-                  onChange={(event) => setAttestationText(event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={handleAttestation}
-                  disabled={claimLoading || attestationLoading}
-                >
-                  {attestationLoading ? 'Submitting...' : 'Create Attestation'}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-6 md:grid-cols-2">
-            <div className="nh-panel rounded-md p-5 sm:p-6">
-              <h3 className="text-lg font-semibold text-orange-50">Incoming Claim Requests</h3>
-              <div className="mt-4 space-y-3">
-                {requests.length === 0 ? (
-                  <p className="text-sm nh-text-muted">No incoming requests yet.</p>
-                ) : (
-                  requests.map((req, index) => (
-                    <div key={`${req[0].toString()}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
-                      <p>Requester: {req[1]}</p>
-                      <p>Purpose: {req[3]}</p>
-                      <div className="mt-3 flex items-center justify-between gap-3">
-                        <p>Status: {req[4] ? 'Fulfilled' : 'Pending'}</p>
-                        <button
-                          type="button"
-                          className="nh-button-primary rounded-xl px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() => void handleAcceptRequest(req[0])}
-                          disabled={req[4] || acceptingRequestId === req[0]}
-                        >
-                          {acceptingRequestId === req[0] ? 'Accepting...' : req[4] ? 'Accepted' : 'Accept'}
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="nh-panel rounded-md p-5 sm:p-6">
-              <h3 className="text-lg font-semibold text-orange-50">Attestations</h3>
-              <div className="mt-4 space-y-3">
-                {!attestations || attestations.length === 0 ? (
-                  <p className="text-sm nh-text-muted">No attestations available.</p>
-                ) : (
-                  (attestations as readonly (AttestationTuple | AttestationObject)[]).map((att, index) => {
-                    const from = isAttestationTuple(att) ? att[0] : att.attester
-                    const statement = isAttestationTuple(att) ? att[2] : att.statement
-
-                    return (
-                      <div key={`${from ?? 'att'}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
-                        <p>From: {from ?? '-'}</p>
-                        <p>{statement ?? '-'}</p>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          </section>
-
-          <BlockchainAnalyticsSection address={address} chainId={chainId} />
 
           <CredentialsSection
             credentials={credentials}

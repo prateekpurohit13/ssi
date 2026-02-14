@@ -142,6 +142,13 @@ export function CredentialsSection({
     })
   }, [credentials])
 
+  const selfIssuedCount = useMemo(
+    () => credentials.filter((credential) => credential.issuer === address).length,
+    [credentials, address]
+  )
+
+  const receivedFromOthersCount = credentials.length - selfIssuedCount
+
   const credentialSlides = useMemo(() => {
     const pageSize = 3
     const slides: Credential[][] = []
@@ -194,12 +201,34 @@ export function CredentialsSection({
 
       const metadata = (await metadataResponse.json()) as {
         documentCid?: string
+        pdfCid?: string
+        fileCid?: string
         credential?: {
           documentCid?: string
+          pdfCid?: string
+          fileCid?: string
         }
+        credentials?: Array<{
+          documentCid?: string
+          credential?: {
+            documentCid?: string
+          }
+        }>
       }
 
-      const documentCid = metadata.documentCid ?? metadata.credential?.documentCid
+      const documentCidFromBatch = metadata.credentials?.find(
+        (entry) => entry.credential?.documentCid || entry.documentCid
+      )
+
+      const documentCid =
+        metadata.documentCid ??
+        metadata.pdfCid ??
+        metadata.fileCid ??
+        metadata.credential?.documentCid ??
+        metadata.credential?.pdfCid ??
+        metadata.credential?.fileCid ??
+        documentCidFromBatch?.credential?.documentCid ??
+        documentCidFromBatch?.documentCid
 
       if (!documentCid) {
         throw new Error('No PDF link found for this credential.')
@@ -221,18 +250,27 @@ export function CredentialsSection({
   return (
     <section className="nh-panel rounded-md p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-orange-50">Issued Credentials</h3>
+        <h3 className="text-lg font-semibold text-orange-50">Wallet Credentials</h3>
         <span className="rounded-full border border-orange-300/25 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">
           Total: {credentials.length}
         </span>
       </div>
       <p className="mt-1 text-sm nh-text-muted">
-        Each card includes status, provenance, and shareable verification QR.
+        Includes credentials issued by you and credentials issued to your wallet by others.
       </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded-full border border-orange-300/25 bg-black/25 px-3 py-1 font-semibold text-orange-100/90">
+          Self-issued: {selfIssuedCount}
+        </span>
+        <span className="rounded-full border border-orange-300/25 bg-black/25 px-3 py-1 font-semibold text-orange-100/90">
+          Received from others: {receivedFromOthersCount}
+        </span>
+      </div>
 
       {credentials.length === 0 && (
         <div className="nh-glass mt-5 rounded-md border border-dashed border-orange-200/20 p-6 text-sm text-orange-100/70">
-          No credentials issued yet.
+          No credentials found for this wallet.
         </div>
       )}
 

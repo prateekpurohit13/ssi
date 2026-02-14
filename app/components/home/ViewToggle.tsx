@@ -4,7 +4,7 @@ export function ViewToggle({
   active,
   className = '',
 }: {
-  active: 'issuer' | 'verifier'
+  active: 'issuer' | 'verifier' | 'analytics' | 'interactions'
   className?: string
 }) {
   return (
@@ -28,6 +28,26 @@ export function ViewToggle({
         }`}
       >
         Verifier Portal
+      </Link>
+      <Link
+        href="/analytics"
+        className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+          active === 'analytics'
+            ? 'bg-linear-to-r from-orange-500 to-amber-400 text-[#2b1208]'
+            : 'text-orange-100/80 hover:bg-orange-500/15 hover:text-orange-50'
+        }`}
+      >
+        Analytics Portal
+      </Link>
+      <Link
+        href="/interactions"
+        className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+          active === 'interactions'
+            ? 'bg-linear-to-r from-orange-500 to-amber-400 text-[#2b1208]'
+            : 'text-orange-100/80 hover:bg-orange-500/15 hover:text-orange-50'
+        }`}
+      >
+        Interactions Portal
       </Link>
     </div>
   )

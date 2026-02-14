@@ -3,14 +3,17 @@
 import { Suspense } from 'react'
 import { useState, useEffect } from 'react'
 import { readContract } from 'wagmi/actions'
-import { useConfig, useDisconnect } from 'wagmi'
+import { useAccount, useConfig, useDisconnect } from 'wagmi'
 import { isAddress, keccak256, stringToBytes } from 'viem'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { contractConfig } from '../contract'
+import { interactionHubConfig } from '../interactionHub'
 import { trustRegistryConfig } from '../trustRegistry'
 import { authenticateWithBiometric } from '../biometricAuth'
 import { ViewToggle } from '../components/home/ViewToggle'
+import { CredentialsSection } from '../components/home/CredentialsSection'
 import ColorBends from '../components/home/ColorBends'
+import DecryptedText from '../components/home/DecryptedText'
 import { useToast } from '../components/ui/ToastProvider'
 
 type Credential = {
@@ -19,6 +22,19 @@ type Credential = {
   isValid: boolean
   issuedAt: bigint
   credentialHash: `0x${string}`
+}
+
+type AttestationTuple = readonly [
+  `0x${string}`,
+  `0x${string}`,
+  string,
+  bigint,
+]
+
+type SharedCidRecord = {
+  cid: string
+  from: `0x${string}`
+  timestamp: bigint
 }
 
 type DisclosedData = Record<string, unknown>
@@ -47,6 +63,7 @@ export default function VerifyPage() {
 }
 
 function VerifyPageContent() {
+  const { address: connectedAddress } = useAccount()
   const config = useConfig()
   const { disconnect } = useDisconnect()
   const router = useRouter()
@@ -63,8 +80,52 @@ function VerifyPageContent() {
   const [issuerTrustMap, setIssuerTrustMap] = useState<Record<string, boolean>>({})
   const [verificationResult, setVerificationResult] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [sharedCids, setSharedCids] = useState<SharedCidRecord[]>([])
+  const [sharedCidsLoading, setSharedCidsLoading] = useState(false)
   const [biometricLoadingIndex, setBiometricLoadingIndex] = useState<number | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [credentialOwnerAddress, setCredentialOwnerAddress] = useState<`0x${string}` | null>(null)
+
+  async function loadSharedCids(addressToFetch: `0x${string}`) {
+    try {
+      setSharedCidsLoading(true)
+
+      const data = await readContract(config, {
+        ...interactionHubConfig,
+        functionName: 'getAttestations',
+        args: [addressToFetch],
+      })
+
+      const records = (data as readonly AttestationTuple[])
+        .map((attestation) => {
+          const statement = attestation[2]
+          const prefix = 'selected_cid:'
+
+          if (!statement.startsWith(prefix)) {
+            return null
+          }
+
+          const cid = statement.slice(prefix.length).trim()
+          if (!cid) {
+            return null
+          }
+
+          return {
+            cid,
+            from: attestation[0],
+            timestamp: attestation[3],
+          } satisfies SharedCidRecord
+        })
+        .filter((entry): entry is SharedCidRecord => Boolean(entry))
+
+      setSharedCids(records)
+    } catch (error) {
+      console.error(error)
+      setSharedCids([])
+    } finally {
+      setSharedCidsLoading(false)
+    }
+  }
 
   async function checkIssuerTrust(issuer: `0x${string}`) {
     try {
@@ -108,12 +169,21 @@ function VerifyPageContent() {
     }
   }, [userParam])
 
+  useEffect(() => {
+    if (!userParam && connectedAddress && !inputAddress.trim()) {
+      const normalizedAddress = connectedAddress.trim()
+      setInputAddress(normalizedAddress)
+      void fetchCredentials(normalizedAddress)
+    }
+  }, [userParam, connectedAddress, inputAddress])
+
   // ---------------- FETCH CREDENTIALS ----------------
   async function fetchCredentials(addressToFetch?: string) {
     const address = (addressToFetch || inputAddress).trim()
     if (!address) return
     if (!isAddress(address)) {
       setCredentials([])
+      setCredentialOwnerAddress(null)
       setIssuerTrustMap({})
       setDisclosedData(null)
       setDisclosedCredentialIndex(null)
@@ -138,7 +208,9 @@ function VerifyPageContent() {
       const creds = data as Credential[]
       setCurrentPage(1)
       setCredentials(creds)
+      setCredentialOwnerAddress(address as `0x${string}`)
       await resolveIssuerTrust(creds)
+      await loadSharedCids(address as `0x${string}`)
 
       // 🔥 AUTO VERIFY IF HASH PROVIDED
       const normalizedUserParam = userParam?.trim().toLowerCase()
@@ -350,7 +422,18 @@ function VerifyPageContent() {
             <div className="max-w-2xl">
               <h2 className="mt-4 text-4xl font-black leading-tight text-orange-50 sm:text-5xl">
                 verify with confidence
-                <span className="mt-1  px-2 text-orange-200">without revealing everything</span>
+                <span className="block bg-linear-to-r from-orange-400/25 to-transparent px-2 text-orange-200">
+                  <DecryptedText
+                    text="without revealing everything"
+                    animateOn="view"
+                    sequential={true}
+                    revealDirection="start"
+                    speed={35}
+                    className="text-orange-200"
+                    encryptedClassName="text-orange-200/45"
+                    parentClassName="block"
+                  />
+                </span>
               </h2>
               <p className="mt-4 text-sm nh-text-muted sm:text-base">
                 Check authenticity and selectively disclose only the data you need.
@@ -386,6 +469,66 @@ function VerifyPageContent() {
                 {loading ? 'Fetching...' : 'Fetch Credentials'}
               </button>
             </div>
+          </section>
+
+          <section className="nh-panel rounded-lg p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Received Shared CIDs</h3>
+              <button
+                type="button"
+                className="nh-button-secondary rounded-xl px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  const trimmedAddress = inputAddress.trim()
+                  if (!trimmedAddress || !isAddress(trimmedAddress)) {
+                    toast.error('Enter a valid wallet address first.')
+                    return
+                  }
+
+                  void loadSharedCids(trimmedAddress as `0x${string}`)
+                }}
+                disabled={sharedCidsLoading}
+              >
+                {sharedCidsLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            <p className="mt-1 text-sm nh-text-muted">
+              Parsed from attestations in format <span className="font-mono">selected_cid:&lt;cid&gt;</span>.
+            </p>
+
+            {sharedCids.length === 0 && !sharedCidsLoading && (
+              <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-6 text-sm text-orange-100/70">
+                No shared CIDs found for this wallet.
+              </div>
+            )}
+
+            {sharedCids.length > 0 && (
+              <div className="mt-5 space-y-3">
+                {sharedCids.map((entry, index) => (
+                  <article key={`${entry.cid}-${index}`} className="nh-glass rounded-lg border border-orange-400/28 p-4 text-sm text-orange-100/85">
+                    <p>
+                      <span className="font-semibold text-orange-50">From:</span>{' '}
+                      <span className="break-all">{entry.from}</span>
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold text-orange-50">Timestamp:</span>{' '}
+                      {new Date(Number(entry.timestamp) * 1000).toLocaleString()}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold text-orange-50">CID:</span>{' '}
+                      <a
+                        href={`https://gateway.pinata.cloud/ipfs/${entry.cid}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all text-orange-300 underline decoration-orange-400/70 underline-offset-2 hover:text-orange-200"
+                      >
+                        {entry.cid}
+                      </a>
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="nh-panel rounded-lg p-5 sm:p-6">
@@ -501,6 +644,17 @@ function VerifyPageContent() {
               )})}
             </div>
           </section>
+
+          {credentialOwnerAddress && (
+            <CredentialsSection
+              credentials={credentials}
+              address={credentialOwnerAddress}
+              revokingCredentialHash={null}
+              authenticatingCredentialHash={null}
+              onRevoke={() => {
+              }}
+            />
+          )}
         </main>
       </div>
 

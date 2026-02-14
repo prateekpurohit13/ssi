@@ -220,7 +220,12 @@ export function CredentialsSection({
 
   return (
     <section className="nh-panel rounded-md p-5 sm:p-6">
-      <h3 className="text-lg font-semibold text-orange-50">Issued Credentials</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold text-orange-50">Issued Credentials</h3>
+        <span className="rounded-full border border-orange-300/25 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">
+          Total: {credentials.length}
+        </span>
+      </div>
       <p className="mt-1 text-sm nh-text-muted">
         Each card includes status, provenance, and shareable verification QR.
       </p>

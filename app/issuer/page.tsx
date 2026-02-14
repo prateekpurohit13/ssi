@@ -572,7 +572,7 @@ export default function IssuerPage() {
             <ViewToggle active="issuer" />
           </div>
 
-          <DashboardHeader />
+          <DashboardHeader chainId={chainId} />
 
           <section className="px-6 sm:px-6">
             <p className="inline-flex items-center gap-2 text-sm text-orange-100/80 sm:text-base">
@@ -720,6 +720,14 @@ export default function IssuerPage() {
                 <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm sm:col-span-2">
                   <p className="text-xs uppercase tracking-wide text-orange-100/70">Transaction Hash</p>
                   <p className="mt-1 truncate font-mono text-orange-50">{latestIssuanceTx.hash}</p>
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${latestIssuanceTx.hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-sm font-semibold text-orange-300 underline decoration-orange-400/70 underline-offset-2 hover:text-orange-200"
+                  >
+                    View on Etherscan
+                  </a>
                 </div>
               </div>
             )}

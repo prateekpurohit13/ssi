@@ -13,11 +13,13 @@ import {
 } from 'wagmi'
 import { readContract, waitForTransactionReceipt } from 'wagmi/actions'
 import { formatEther, formatGwei, isAddress, keccak256, stringToBytes } from 'viem'
+import { MerkleTree } from 'merkletreejs'
+import keccak256Lib from 'keccak256'
 import { contractConfig } from '../contract'
 import { trustRegistryConfig } from '../trustRegistry'
 import { interactionHubConfig } from '../interactionHub'
 import { authenticateWithBiometric } from '../biometricAuth'
-import { uploadFileToIPFS, uploadToIPFS } from '../ipfs'
+import { uploadToIPFS } from '../ipfs'
 import { DashboardHeader } from '../components/home/DashboardHeader'
 import { StatsGrid } from '../components/home/StatsGrid'
 import { IssueCredentialSection } from '../components/home/IssueCredentialSection'
@@ -142,6 +144,8 @@ export default function IssuerPage() {
   const [authenticatingRevokeHash, setAuthenticatingRevokeHash] = useState<`0x${string}` | null>(null)
   const [requests, setRequests] = useState<ClaimRequestTuple[]>([])
   const [latestIssuanceTx, setLatestIssuanceTx] = useState<IssuanceTxDetails | null>(null)
+  const [batchMode, setBatchMode] = useState(false)
+  const [batchCredentials, setBatchCredentials] = useState<any[]>([])
 
   useEffect(() => {
     async function loadRequests() {
@@ -241,151 +245,102 @@ export default function IssuerPage() {
   }
 
   async function handleIssue() {
-    if (
-      !address ||
-      loading ||
-      authenticatingIssue ||
-      Boolean(authenticatingRevokeHash) ||
-      Boolean(revokingCredentialHash)
-    ) {
-      return
-    }
+    if (!address) return
 
-    setAuthenticatingIssue(true)
-    const biometricResult = await authenticateWithBiometric(address)
-    setAuthenticatingIssue(false)
+    const targetAddress =
+      recipient && recipient.startsWith('0x')
+        ? recipient
+        : address
 
-    if (!biometricResult.ok) {
-      toast.error(biometricResult.message)
-      return
-    }
+    const selectedFields = selectedFieldKeys.reduce<Record<string, string>>((acc, fieldKey) => {
+      const value = extractedFields[fieldKey]?.trim()
+      if (value) {
+        acc[fieldKey] = value
+      }
+      return acc
+    }, {})
+
+    const name =
+      selectedFields.full_name ||
+      selectedFields.student_name ||
+      ''
+    const type = selectedDocumentType
+    const year =
+      selectedFields.year_of_passing ||
+      selectedFields.date_of_birth ||
+      ''
 
     try {
       setLoading(true)
 
-      if (!file) {
-        toast.info('Upload a document first.')
-        return
-      }
-
-      const requiredFields = DOCUMENT_SCHEMAS[selectedDocumentType]
-      const hasAnyExtractedValue = requiredFields.some((fieldKey) => Boolean(extractedFields[fieldKey]?.trim()))
-
-      if (!hasAnyExtractedValue) {
-        toast.info('Extract data from the uploaded document before issuing credential.')
-        return
-      }
-
-      const selectedFields = selectedFieldKeys.reduce<Record<string, string>>((acc, fieldKey) => {
-        const value = extractedFields[fieldKey]?.trim()
-        if (value) {
-          acc[fieldKey] = value
-        }
-        return acc
-      }, {})
-
-      if (Object.keys(selectedFields).length === 0) {
-        toast.info('Select at least one extracted field to include in the credential.')
-        return
-      }
-
-      const targetAddress =
-        recipient && isAddress(recipient)
-          ? (recipient as `0x${string}`)
-          : address
-
-      const documentCid = await uploadFileToIPFS(file)
-
-      const primaryName =
-        selectedFields.full_name ||
-        selectedFields.student_name ||
-        ''
-
-      const yearOfRecord =
-        selectedFields.year_of_passing ||
-        selectedFields.date_of_birth ||
-        ''
-
       const credential = {
-        name: primaryName,
-        type: selectedDocumentType,
-        year: yearOfRecord,
-        documentType: selectedDocumentType,
-        fields: selectedFields,
-        documentCid,
-        documentName: file.name,
+        name,
+        type,
+        year,
         issuedTo: targetAddress,
         timestamp: new Date().toISOString(),
       }
 
-      const cid = await uploadToIPFS(credential)
+      if (!batchMode) {
+        const cid = await uploadToIPFS(credential)
 
-      const hashValue = keccak256(
-        stringToBytes(JSON.stringify(credential))
+        const hashValue = keccak256(
+          stringToBytes(JSON.stringify(credential))
+        )
+
+        const txHash = await writeContractAsync({
+          ...contractConfig,
+          functionName: 'issueCredential',
+          args: [targetAddress as `0x${string}`, hashValue, cid],
+        })
+
+        await waitForTransactionReceipt(config, { hash: txHash })
+        await refetch()
+        alert('Single Credential Issued')
+        return
+      }
+
+      const updatedBatch = [...batchCredentials, credential]
+      setBatchCredentials(updatedBatch)
+
+      const leaves = updatedBatch.map((c) =>
+        keccak256Lib(JSON.stringify(c))
       )
+
+      const tree = new MerkleTree(leaves, keccak256Lib, {
+        sortPairs: true,
+      })
+
+      const root = tree.getHexRoot()
+
+      const batchWithProofs = updatedBatch.map((c, i) => {
+        const leaf = leaves[i]
+        const proof = tree.getHexProof(leaf)
+
+        return {
+          credential: c,
+          leaf: '0x' + leaf.toString('hex'),
+          proof,
+        }
+      })
+
+      const batchPayload = {
+        root,
+        credentials: batchWithProofs,
+      }
+
+      const batchCID = await uploadToIPFS(batchPayload)
 
       const txHash = await writeContractAsync({
         ...contractConfig,
         functionName: 'issueCredential',
-        args: [targetAddress, hashValue, cid],
+        args: [targetAddress as `0x${string}`, root as `0x${string}`, batchCID],
       })
 
       await waitForTransactionReceipt(config, { hash: txHash })
-
-      if (publicClient) {
-        const receipt = await publicClient.getTransactionReceipt({ hash: txHash })
-        const [latestBlock, block] = await Promise.all([
-          publicClient.getBlockNumber(),
-          publicClient.getBlock({ blockHash: receipt.blockHash }),
-        ])
-
-        const confirmations = latestBlock >= receipt.blockNumber
-          ? latestBlock - receipt.blockNumber + BigInt(1)
-          : BigInt(0)
-        const ethSpent = receipt.gasUsed * receipt.effectiveGasPrice
-
-        let usdEquivalent: number | undefined
-        try {
-          const priceResponse = await fetch(
-            'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
-          )
-
-          if (priceResponse.ok) {
-            const priceData = (await priceResponse.json()) as {
-              ethereum?: { usd?: number }
-            }
-
-            if (priceData.ethereum?.usd) {
-              usdEquivalent = Number(formatEther(ethSpent)) * priceData.ethereum.usd
-            }
-          }
-        } catch (priceError) {
-          console.warn('Failed to fetch ETH/USD quote', priceError)
-        }
-
-        setLatestIssuanceTx({
-          hash: txHash,
-          blockNumber: receipt.blockNumber,
-          confirmations,
-          blockHash: receipt.blockHash,
-          timestamp: block.timestamp,
-          gasUsed: receipt.gasUsed,
-          effectiveGasPrice: receipt.effectiveGasPrice,
-          ethSpent,
-          usdEquivalent,
-        })
-      }
-
-      setExtractedFields({})
-      setSelectedFieldKeys([])
-      setRecipient('')
-      setFile(null)
-
       await refetch()
-      toast.success('Credential Issued Successfully!')
-    } catch (err) {
-      console.error(err)
-      toast.error('Error issuing credential')
+
+      alert('Merkle Batch Root Anchored On-Chain')
     } finally {
       setLoading(false)
     }
@@ -629,7 +584,19 @@ export default function IssuerPage() {
             </div>
           </section>
 
+          <div className="mt-6 mb-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={batchMode}
+                onChange={() => setBatchMode(!batchMode)}
+              />
+              Enable Merkle Batch Mode
+            </label>
+          </div>
+
           <section className="grid gap-6 lg:grid-cols-[minmax(0,4.2fr)_minmax(200px,1fr)]">
+
             <IssueCredentialSection
               selectedDocumentType={selectedDocumentType}
               documentTypeOptions={DOCUMENT_TYPE_OPTIONS}

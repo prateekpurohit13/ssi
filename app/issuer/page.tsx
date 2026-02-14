@@ -20,6 +20,7 @@ import { DashboardHeader } from '../components/home/DashboardHeader'
 import { StatsGrid } from '../components/home/StatsGrid'
 import { IssueCredentialSection } from '../components/home/IssueCredentialSection'
 import { CredentialsSection } from '../components/home/CredentialsSection'
+import { BlockchainAnalyticsSection } from '../components/home/BlockchainAnalyticsSection'
 import { ViewToggle } from '../components/home/ViewToggle'
 import ColorBends from '../components/home/ColorBends'
 import type { Credential } from '../components/home/types'
@@ -313,6 +314,8 @@ export default function IssuerPage() {
               layout="stack"
             />
           </section>
+
+          <BlockchainAnalyticsSection address={address} chainId={chainId} />
 
           <CredentialsSection
             credentials={credentials}

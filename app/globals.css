@@ -57,17 +57,19 @@ body {
 }
 
 .nh-panel {
-  border: 1px solid rgba(255, 141, 77, 0.28);
+  border: 1px solid rgba(255, 196, 160, 0.18);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: 0 0 0 1px rgba(255, 111, 46, 0.08) inset, 0 12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 208, 178, 0.05) inset, 0 12px 40px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  border-radius: 0.625rem;
 }
 
 .nh-glass {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  border-radius: 0.625rem;
 }
 
 .nh-chip {

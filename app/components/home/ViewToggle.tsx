@@ -8,7 +8,7 @@ export function ViewToggle({
   className?: string
 }) {
   return (
-    <div className={`nh-glass inline-flex rounded-lg border border-orange-400/30 p-1 shadow-[0_10px_28px_rgba(0,0,0,0.4)] ${className}`}>
+    <div className={`nh-glass inline-flex rounded-md border border-orange-200/20 p-1 shadow-[0_10px_28px_rgba(0,0,0,0.4)] ${className}`}>
       <Link
         href="/issuer"
         className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${

@@ -8,6 +8,9 @@ Create a `.env.local` file in `SSI-fe` with one of these Pinata auth options:
 # Required for OCR document extraction
 GEMINI_API_KEY=your_gemini_api_key
 
+# Required for on-chain analytics charts
+ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
+
 # Option 1 (recommended)
 PINATA_JWT=your_pinata_jwt
 

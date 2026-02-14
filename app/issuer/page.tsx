@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   useAccount,
+  useChainId,
   useDisconnect,
   useReadContract,
   useWriteContract,
@@ -25,6 +26,7 @@ import type { Credential } from '../components/home/types'
 
 export default function IssuerPage() {
   const { address } = useAccount()
+  const chainId = useChainId()
   const { disconnect } = useDisconnect()
   const router = useRouter()
   const config = useConfig()
@@ -247,7 +249,7 @@ export default function IssuerPage() {
 
           <DashboardHeader />
 
-          <section className="nh-panel rounded-lg p-4 sm:p-5">
+          <section className="nh-panel rounded-md p-4 sm:p-5">
             <p className="text-sm font-semibold text-orange-50">Trust Registry</p>
             <p className="mt-1 text-sm text-orange-100/80">
               {trustLoading
@@ -256,7 +258,7 @@ export default function IssuerPage() {
             </p>
           </section>
 
-          <section className=" relative overflow-hidden rounded-xl px-6 pb-6 pt-2 sm:px-6 sm:pb-6 sm:pt-2">
+          <section className=" relative overflow-hidden rounded-md px-6 pb-6 pt-2 sm:px-6 sm:pb-6 sm:pt-2">
             <div className="flex items-start justify-between gap-4">
               <p className="nh-chip inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide">
                 NeuralHash Issuer Space
@@ -285,29 +287,32 @@ export default function IssuerPage() {
             </div>
           </section>
 
-          <StatsGrid
-            walletConnected={Boolean(address)}
-            totalCredentials={credentials.length}
-            activeCredentials={activeCredentials}
-            revokedCredentials={revokedCredentials}
-          />
+          <section className="grid gap-6 lg:grid-cols-[minmax(0,4.2fr)_minmax(200px,1fr)]">
+            <IssueCredentialSection
+              name={name}
+              type={type}
+              year={year}
+              recipient={recipient}
+              file={file}
+              loading={loading}
+              authenticating={authenticatingIssue}
+              onNameChange={setName}
+              onTypeChange={setType}
+              onYearChange={setYear}
+              onRecipientChange={setRecipient}
+              onFileChange={setFile}
+              onExtract={handleExtract}
+              onIssue={handleIssue}
+            />
 
-          <IssueCredentialSection
-            name={name}
-            type={type}
-            year={year}
-            recipient={recipient}
-            file={file}
-            loading={loading}
-            authenticating={authenticatingIssue}
-            onNameChange={setName}
-            onTypeChange={setType}
-            onYearChange={setYear}
-            onRecipientChange={setRecipient}
-            onFileChange={setFile}
-            onExtract={handleExtract}
-            onIssue={handleIssue}
-          />
+            <StatsGrid
+              walletConnected={Boolean(address)}
+              totalCredentials={credentials.length}
+              activeCredentials={activeCredentials}
+              revokedCredentials={revokedCredentials}
+              layout="stack"
+            />
+          </section>
 
           <CredentialsSection
             credentials={credentials}

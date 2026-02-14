@@ -40,13 +40,13 @@ export function IssueCredentialSection({
   }, [file])
 
   return (
-    <section className="nh-panel rounded-lg p-5 sm:p-6">
+    <section className="nh-panel rounded-md p-5 sm:p-6">
       <h3 className="text-lg font-semibold text-orange-50">Issue Credential</h3>
       <p className="mt-1 text-sm nh-text-muted">
         Create a new verifiable credential and anchor it with IPFS + blockchain hash.
       </p>
 
-      <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-4">
+      <div className="nh-glass mt-5 rounded-md border border-dashed border-orange-200/20 p-4">
         <p className="text-sm font-semibold text-orange-100">Auto-fill from PDF</p>
         <input
           ref={fileInputRef}

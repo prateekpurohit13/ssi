@@ -18,7 +18,7 @@ function CredentialCard({
   const isAuthenticating = authenticatingCredentialHash === credential.credentialHash
 
   return (
-    <article className="nh-glass grid gap-5 rounded-lg border border-orange-400/28 p-5 md:grid-cols-[1fr_auto]">
+    <article className="nh-glass grid gap-5 rounded-md border border-orange-200/20 p-5 md:grid-cols-[1fr_auto]">
       <div className="space-y-2 text-sm text-orange-100/85">
         <p>
           <span className="font-semibold text-orange-50">IPFS CID:</span>{' '}
@@ -66,7 +66,7 @@ function CredentialCard({
         )}
       </div>
 
-      <div className="nh-glass flex flex-col items-center justify-center rounded-lg border border-orange-400/28 p-4">
+      <div className="nh-glass flex flex-col items-center justify-center rounded-md border border-orange-200/20 p-4">
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-orange-100/70">
           Scan to Verify
         </p>
@@ -99,14 +99,14 @@ export function CredentialsSection({
   onRevoke: (credentialHash: `0x${string}`) => void
 }) {
   return (
-    <section className="nh-panel rounded-lg p-5 sm:p-6">
+    <section className="nh-panel rounded-md p-5 sm:p-6">
       <h3 className="text-lg font-semibold text-orange-50">Issued Credentials</h3>
       <p className="mt-1 text-sm nh-text-muted">
         Each card includes status, provenance, and shareable verification QR.
       </p>
 
       {credentials.length === 0 && (
-        <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-6 text-sm text-orange-100/70">
+        <div className="nh-glass mt-5 rounded-md border border-dashed border-orange-200/20 p-6 text-sm text-orange-100/70">
           No credentials issued yet.
         </div>
       )}

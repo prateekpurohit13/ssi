@@ -10,10 +10,11 @@ import {
   useWriteContract,
   useConfig,
 } from 'wagmi'
-import { waitForTransactionReceipt } from 'wagmi/actions'
+import { readContract, waitForTransactionReceipt } from 'wagmi/actions'
 import { isAddress, keccak256, stringToBytes } from 'viem'
 import { contractConfig } from '../contract'
 import { trustRegistryConfig } from '../trustRegistry'
+import { interactionHubConfig } from '../interactionHub'
 import { authenticateWithBiometric } from '../biometricAuth'
 import { uploadFileToIPFS, uploadToIPFS } from '../ipfs'
 import { DashboardHeader } from '../components/home/DashboardHeader'
@@ -31,6 +32,32 @@ import {
   normalizeDocumentType,
   type SupportedDocumentType,
 } from '../documentSchemas'
+
+type ClaimRequestTuple = readonly [
+  bigint,
+  `0x${string}`,
+  `0x${string}`,
+  readonly string[],
+  string,
+  boolean,
+  bigint,
+]
+
+type AttestationTuple = readonly [
+  `0x${string}`,
+  `0x${string}`,
+  string,
+  bigint,
+]
+
+type AttestationObject = {
+  attester?: `0x${string}`
+  statement?: string
+}
+
+function isAttestationTuple(value: AttestationTuple | AttestationObject): value is AttestationTuple {
+  return Array.isArray(value)
+}
 
 export default function IssuerPage() {
   const { address } = useAccount()
@@ -64,6 +91,24 @@ export default function IssuerPage() {
     },
   })
 
+  const { data: requestIds } = useReadContract({
+    ...interactionHubConfig,
+    functionName: 'getRequestsForUser',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(address),
+    },
+  })
+
+  const { data: attestations } = useReadContract({
+    ...interactionHubConfig,
+    functionName: 'getAttestations',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(address),
+    },
+  })
+
   const { writeContractAsync } = useWriteContract()
 
   const [selectedDocumentType, setSelectedDocumentType] = useState<SupportedDocumentType>('10th Marksheet')
@@ -71,10 +116,39 @@ export default function IssuerPage() {
   const [selectedFieldKeys, setSelectedFieldKeys] = useState<string[]>([])
   const [recipient, setRecipient] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [hubTargetAddress, setHubTargetAddress] = useState('')
+  const [claimReason, setClaimReason] = useState('')
+  const [attestationText, setAttestationText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [claimLoading, setClaimLoading] = useState(false)
+  const [attestationLoading, setAttestationLoading] = useState(false)
   const [revokingCredentialHash, setRevokingCredentialHash] = useState<`0x${string}` | null>(null)
   const [authenticatingIssue, setAuthenticatingIssue] = useState(false)
   const [authenticatingRevokeHash, setAuthenticatingRevokeHash] = useState<`0x${string}` | null>(null)
+  const [requests, setRequests] = useState<ClaimRequestTuple[]>([])
+
+  useEffect(() => {
+    async function loadRequests() {
+      if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+        setRequests([])
+        return
+      }
+
+      const results = await Promise.all(
+        requestIds.map((id) =>
+          readContract(config, {
+            ...interactionHubConfig,
+            functionName: 'claimRequests',
+            args: [id],
+          })
+        )
+      )
+
+      setRequests(results as ClaimRequestTuple[])
+    }
+
+    void loadRequests()
+  }, [config, requestIds])
 
   const credentials = (data ?? []) as Credential[]
   const activeCredentials = credentials.filter((cred) => cred.isValid).length
@@ -299,6 +373,84 @@ export default function IssuerPage() {
     }
   }
 
+
+  async function handleClaimRequest() {
+    if (!address) {
+      return
+    }
+
+    if (!hubTargetAddress || !isAddress(hubTargetAddress)) {
+      toast.error('Enter a valid target wallet address for claim request.')
+      return
+    }
+
+    if (!claimReason.trim()) {
+      toast.info('Enter a claim reason first.')
+      return
+    }
+
+    try {
+      setClaimLoading(true)
+
+      const txHash = await writeContractAsync({
+        ...interactionHubConfig,
+        functionName: 'createClaimRequest',
+        args: [
+          hubTargetAddress as `0x${string}`,
+          ['type', 'year'],
+          claimReason,
+        ],
+      })
+
+      await waitForTransactionReceipt(config, { hash: txHash })
+      toast.success('Claim Request Sent')
+      setClaimReason('')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to send claim request')
+    } finally {
+      setClaimLoading(false)
+    }
+  }
+
+  async function handleAttestation() {
+    if (!address) {
+      return
+    }
+
+    if (!hubTargetAddress || !isAddress(hubTargetAddress)) {
+      toast.error('Enter a valid target wallet address for attestation.')
+      return
+    }
+
+    if (!attestationText.trim()) {
+      toast.info('Enter attestation text first.')
+      return
+    }
+
+    try {
+      setAttestationLoading(true)
+
+      const txHash = await writeContractAsync({
+        ...interactionHubConfig,
+        functionName: 'createAttestation',
+        args: [
+          hubTargetAddress as `0x${string}`,
+          attestationText,
+        ],
+      })
+
+      await waitForTransactionReceipt(config, { hash: txHash })
+      toast.success('Attestation Created')
+      setAttestationText('')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to create attestation')
+    } finally {
+      setAttestationLoading(false)
+    }
+  }
+
   if (!address) {
     return null
   }
@@ -415,6 +567,96 @@ export default function IssuerPage() {
               revokedCredentials={revokedCredentials}
               layout="stack"
             />
+          </section>
+
+          <section className="nh-panel rounded-md p-5 sm:p-6">
+            <h3 className="text-lg font-semibold text-orange-50">Interaction Hub</h3>
+            <p className="mt-1 text-sm nh-text-muted">
+              Create claim requests and attestations for a target wallet.
+            </p>
+
+            <div className="mt-5 space-y-3">
+              <input
+                className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
+                placeholder="Target Wallet Address"
+                value={hubTargetAddress}
+                onChange={(event) => setHubTargetAddress(event.target.value)}
+              />
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
+                  placeholder="Claim Reason"
+                  value={claimReason}
+                  onChange={(event) => setClaimReason(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={handleClaimRequest}
+                  disabled={claimLoading || attestationLoading}
+                >
+                  {claimLoading ? 'Sending...' : 'Send Claim Request'}
+                </button>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
+                  placeholder="Attestation Text"
+                  value={attestationText}
+                  onChange={(event) => setAttestationText(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={handleAttestation}
+                  disabled={claimLoading || attestationLoading}
+                >
+                  {attestationLoading ? 'Submitting...' : 'Create Attestation'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid gap-6 md:grid-cols-2">
+            <div className="nh-panel rounded-md p-5 sm:p-6">
+              <h3 className="text-lg font-semibold text-orange-50">Incoming Claim Requests</h3>
+              <div className="mt-4 space-y-3">
+                {requests.length === 0 ? (
+                  <p className="text-sm nh-text-muted">No incoming requests yet.</p>
+                ) : (
+                  requests.map((req, index) => (
+                    <div key={`${req[0].toString()}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                      <p>Requester: {req[1]}</p>
+                      <p>Purpose: {req[4]}</p>
+                      <p>Status: {req[5] ? 'Fulfilled' : 'Pending'}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="nh-panel rounded-md p-5 sm:p-6">
+              <h3 className="text-lg font-semibold text-orange-50">Attestations</h3>
+              <div className="mt-4 space-y-3">
+                {!attestations || attestations.length === 0 ? (
+                  <p className="text-sm nh-text-muted">No attestations available.</p>
+                ) : (
+                  (attestations as readonly (AttestationTuple | AttestationObject)[]).map((att, index) => {
+                    const from = isAttestationTuple(att) ? att[0] : att.attester
+                    const statement = isAttestationTuple(att) ? att[2] : att.statement
+
+                    return (
+                      <div key={`${from ?? 'att'}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                        <p>From: {from ?? '-'}</p>
+                        <p>{statement ?? '-'}</p>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
           </section>
 
           <BlockchainAnalyticsSection address={address} chainId={chainId} />

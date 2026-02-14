@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { useState, useEffect } from 'react'
 import { readContract } from 'wagmi/actions'
 import { useConfig, useDisconnect } from 'wagmi'
-import { keccak256, stringToBytes } from 'viem'
+import { isAddress, keccak256, stringToBytes } from 'viem'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { contractConfig } from '../contract'
 import { trustRegistryConfig } from '../trustRegistry'
@@ -22,6 +22,15 @@ type Credential = {
 }
 
 type DisclosedData = Record<string, unknown>
+const CREDENTIALS_PER_PAGE = 5
+const PUBLIC_DISCLOSURE_FIELDS = new Set(['type', 'documentType', 'year'])
+
+function maskCid(cid: string) {
+  if (cid.length <= 18) {
+    return cid
+  }
+  return `${cid.slice(0, 10)}...${cid.slice(-8)}`
+}
 
 export default function VerifyPage() {
   return (
@@ -55,6 +64,7 @@ function VerifyPageContent() {
   const [verificationResult, setVerificationResult] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [biometricLoadingIndex, setBiometricLoadingIndex] = useState<number | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   async function checkIssuerTrust(issuer: `0x${string}`) {
     try {
@@ -92,14 +102,26 @@ function VerifyPageContent() {
   // ---------------- AUTO FILL ADDRESS ----------------
   useEffect(() => {
     if (userParam) {
-      setInputAddress(userParam)
+      const normalizedAddress = userParam.trim()
+      setInputAddress(normalizedAddress)
+      fetchCredentials(normalizedAddress)
     }
   }, [userParam])
 
   // ---------------- FETCH CREDENTIALS ----------------
   async function fetchCredentials(addressToFetch?: string) {
-    const address = addressToFetch || inputAddress
+    const address = (addressToFetch || inputAddress).trim()
     if (!address) return
+    if (!isAddress(address)) {
+      setCredentials([])
+      setIssuerTrustMap({})
+      setDisclosedData(null)
+      setDisclosedCredentialIndex(null)
+      setVerificationResult(null)
+      setCurrentPage(1)
+      toast.error('Please enter a valid wallet address.')
+      return
+    }
 
     try {
       setLoading(true)
@@ -114,11 +136,18 @@ function VerifyPageContent() {
       })
 
       const creds = data as Credential[]
+      setCurrentPage(1)
       setCredentials(creds)
       await resolveIssuerTrust(creds)
 
       // 🔥 AUTO VERIFY IF HASH PROVIDED
-      if (hashParam) {
+      const normalizedUserParam = userParam?.trim().toLowerCase()
+      const shouldAutoVerifyFromQuery =
+        Boolean(hashParam) &&
+        Boolean(normalizedUserParam) &&
+        address.toLowerCase() === normalizedUserParam
+
+      if (shouldAutoVerifyFromQuery) {
         const index = creds.findIndex(
           (cred) => cred.credentialHash === hashParam
         )
@@ -130,17 +159,22 @@ function VerifyPageContent() {
 
     } catch (err) {
       console.error(err)
+      toast.error('Failed to fetch credentials.')
     } finally {
       setLoading(false)
     }
   }
 
-  // ---------------- AUTO FETCH ----------------
+  const totalPages = Math.max(1, Math.ceil(credentials.length / CREDENTIALS_PER_PAGE))
+  const currentPageStart = (currentPage - 1) * CREDENTIALS_PER_PAGE
+  const paginatedCredentials = credentials.slice(currentPageStart, currentPageStart + CREDENTIALS_PER_PAGE)
+  const currentPageEnd = Math.min(currentPageStart + paginatedCredentials.length, credentials.length)
+
   useEffect(() => {
-    if (inputAddress) {
-      fetchCredentials(inputAddress)
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
     }
-  }, [inputAddress])
+  }, [currentPage, totalPages])
 
   // ---------------- VERIFY ----------------
   async function verifyCredential(
@@ -149,6 +183,10 @@ function VerifyPageContent() {
   ) {
     const creds = credsOverride || credentials
     const cred = creds[index]
+    if (!cred) {
+      toast.error('Credential record not found.')
+      return
+    }
 
     if (!cred.isValid) {
       setVerificationResult('❌ Credential Revoked')
@@ -159,6 +197,9 @@ function VerifyPageContent() {
       const res = await fetch(
         `https://gateway.pinata.cloud/ipfs/${cred.ipfsCID}`
       )
+      if (!res.ok) {
+        throw new Error('Unable to fetch credential payload from IPFS.')
+      }
 
       const json = await res.json()
 
@@ -211,11 +252,22 @@ function VerifyPageContent() {
     }
 
     const cred = credentials[index]
+    if (!cred) {
+      toast.error('Credential record not found.')
+      return
+    }
+    if (!cred.isValid) {
+      toast.error('Cannot disclose data from a revoked credential.')
+      return
+    }
 
     try {
       const res = await fetch(
         `https://gateway.pinata.cloud/ipfs/${cred.ipfsCID}`
       )
+      if (!res.ok) {
+        throw new Error('Unable to fetch credential metadata from IPFS.')
+      }
 
       const json = await res.json()
       const credentialData = json?.credential ?? json
@@ -227,7 +279,15 @@ function VerifyPageContent() {
       }
 
       const filteredEntries = Object.entries(credentialData as Record<string, unknown>).filter(
-        ([key]) => key !== 'issuedTo' && key !== 'timestamp'
+        ([key, value]) => {
+          if (!PUBLIC_DISCLOSURE_FIELDS.has(key)) {
+            return false
+          }
+          if (value === null || value === undefined) {
+            return false
+          }
+          return typeof value === 'string' ? value.trim().length > 0 : true
+        }
       )
 
       const dynamicFields: DisclosedData = {}
@@ -240,6 +300,7 @@ function VerifyPageContent() {
 
     } catch (err) {
       console.error(err)
+      toast.error('Failed to disclose credential details.')
     }
   }
 
@@ -332,6 +393,33 @@ function VerifyPageContent() {
             <p className="mt-1 text-sm nh-text-muted">Verify cryptographic integrity before accepting any claim.</p>
             <p className="mt-1 text-xs text-orange-100/70">Selective disclosure requires biometric authentication.</p>
 
+            {credentials.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-orange-100/70">
+                <p>
+                  Showing {currentPageStart + 1}-{currentPageEnd} of {credentials.length} entries
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((value) => Math.max(value - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="nh-button-secondary rounded-xl px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Previous
+                  </button>
+                  <span>Page {currentPage} of {totalPages}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((value) => Math.min(value + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="nh-button-secondary rounded-xl px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+
             {credentials.length === 0 && !loading && (
               <div className="nh-glass mt-5 rounded-lg border border-dashed border-orange-400/35 p-6 text-sm text-orange-100/70">
                 No credentials found.
@@ -339,12 +427,14 @@ function VerifyPageContent() {
             )}
 
             <div className="mt-5 space-y-4">
-              {credentials.map((cred, index) => (
-                <article key={index} className="nh-glass rounded-lg border border-orange-400/28 p-5">
+              {paginatedCredentials.map((cred, pageIndex) => {
+                const index = currentPageStart + pageIndex
+                return (
+                <article key={`${cred.credentialHash}-${index}`} className="nh-glass rounded-lg border border-orange-400/28 p-5">
                   <div className="space-y-2 text-sm text-orange-100/85">
                     <p>
                       <span className="font-semibold text-orange-50">IPFS CID:</span>{' '}
-                      <span className="break-all">{cred.ipfsCID}</span>
+                      <span className="break-all">{maskCid(cred.ipfsCID)}</span>
                     </p>
                     <p>
                       <span className="font-semibold text-orange-50">Issuer:</span> <span className="break-all">{cred.issuer}</span>
@@ -389,20 +479,26 @@ function VerifyPageContent() {
                   {disclosedData && disclosedCredentialIndex === index && (
                     <div className="mt-4">
                       <p className="text-lg font-semibold text-orange-50">Selectively Disclosed Information</p>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        {Object.entries(disclosedData).map(([key, value]) => (
-                          <div key={key} className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
-                            <span className="font-semibold capitalize text-orange-50">{key}:</span>{' '}
-                            {typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-                              ? String(value)
-                              : JSON.stringify(value)}
-                          </div>
-                        ))}
-                      </div>
+                      {Object.entries(disclosedData).length === 0 ? (
+                        <p className="mt-2 text-sm text-orange-100/75">
+                          No public fields are available for disclosure on this credential.
+                        </p>
+                      ) : (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {Object.entries(disclosedData).map(([key, value]) => (
+                            <div key={key} className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
+                              <span className="font-semibold capitalize text-orange-50">{key}:</span>{' '}
+                              {typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+                                ? String(value)
+                                : JSON.stringify(value)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </article>
-              ))}
+              )})}
             </div>
           </section>
         </main>

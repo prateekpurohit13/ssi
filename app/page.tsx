@@ -6,6 +6,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import ColorBends from './components/home/ColorBends'
 import TextType from './components/home/TextType'
+import MagicBento from './components/home/MagicBento'
 
 export default function Home() {
   const { address } = useAccount()
@@ -35,9 +36,10 @@ export default function Home() {
       </div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,138,51,0.16),transparent_36%),radial-gradient(circle_at_80%_72%,rgba(255,106,0,0.2),transparent_32%),linear-gradient(180deg,rgba(2,2,4,0.62)_0%,rgba(2,2,4,0.72)_100%)]" />
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <main className="space-y-8">
-          <div className="max-w-3xl">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+        <main className="space-y-10">
+          <section className="flex min-h-[70vh] items-center">
+            <div className="max-w-3xl">
             <div className="inline-flex items-center gap-3 rounded-2xl border border-orange-300/35 bg-black/25 px-4 py-2.5">
               <span className="grid h-9 w-9 place-items-center rounded-xl border border-orange-300/45 bg-linear-to-br from-orange-500/30 to-orange-700/20">
                 <svg viewBox="0 0 24 24" className="h-5 w-5 text-orange-200" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -70,18 +72,57 @@ export default function Home() {
                 hideCursorOnComplete={true}
               />
             </h1>
-            <p className="mt-4 max-w-2xl font-mono text-sm text-orange-100/80 sm:text-base">
+            <p className="mt-4 max-w-9xl font-mono text-sm text-orange-100/80 sm:text-base">
               Create tamper-evident credentials, store proofs on IPFS, and verify authenticity with cryptographic confidence.
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="scale-[1.04]">
-              <ConnectButton label="Connect Wallet" />
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <div className="scale-[1.04]">
+                <ConnectButton label="Connect Wallet" />
+              </div>
             </div>
-          </div>
-          <p className="text-sm text-orange-100/80 font-mono sm:text-base">Issue credentials securely, Store hashes and metadata on-chain + IPFS, Verify authenticity in one flow</p>
+            <p className="mt-4 text-sm text-orange-100/80 font-mono sm:text-base">Issue credentials securely, store hashes and metadata on-chain + IPFS, and verify authenticity in one flow.</p>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="w-full">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-200/85">Platform Direction</p>
+              <h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                Built for verifiable trust at <span className="text-[#fdba74]">internet scale</span>
+              </h2>
+              <p className="mt-3 w-full max-w-5xl text-sm text-orange-100/80 sm:text-base">
+                NeuralHash SSI focuses on high-integrity identity workflows: trusted issuers, portable proofs, selective disclosure, and auditable revocation.
+                The platform intent is to reduce manual verification friction while preserving user control over personal data.
+              </p>
+            </div>
+
+            <div className="mt-4 w-full">
+              <MagicBento
+                enableStars={true}
+                enableSpotlight={true}
+                enableBorderGlow={true}
+                enableTilt={false}
+                clickEffect={true}
+                enableMagnetism={true}
+                textAutoHide={false}
+                particleCount={10}
+                glowColor="255, 120, 24"
+              />
+            </div>
+
+            
+          </section>
+
         </main>
+
+        <footer className="mt-12 border-t border-orange-300/20 pt-6">
+          <div className="flex flex-col gap-4 text-sm text-orange-100/75 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              <span className="font-semibold text-orange-200">NeuralHash SSI</span> · Verifiable credentials platform for issuance, trust, and secure verification.
+            </p>
+            <p className="font-mono">© 2026 NeuralHash SSI · Built for decentralized identity workflows</p>
+          </div>
+        </footer>
       </div>
     </div>
   )

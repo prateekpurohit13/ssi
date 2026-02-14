@@ -122,6 +122,7 @@ export default function IssuerPage() {
   const [loading, setLoading] = useState(false)
   const [claimLoading, setClaimLoading] = useState(false)
   const [attestationLoading, setAttestationLoading] = useState(false)
+  const [acceptingRequestId, setAcceptingRequestId] = useState<bigint | null>(null)
   const [revokingCredentialHash, setRevokingCredentialHash] = useState<`0x${string}` | null>(null)
   const [authenticatingIssue, setAuthenticatingIssue] = useState(false)
   const [authenticatingRevokeHash, setAuthenticatingRevokeHash] = useState<`0x${string}` | null>(null)
@@ -451,6 +452,39 @@ export default function IssuerPage() {
     }
   }
 
+  async function handleAcceptRequest(requestId: bigint) {
+    if (!address) {
+      return
+    }
+
+    try {
+      setAcceptingRequestId(requestId)
+
+      const txHash = await writeContractAsync({
+        ...interactionHubConfig,
+        functionName: 'fulfillClaimRequest',
+        args: [requestId],
+      })
+
+      await waitForTransactionReceipt(config, { hash: txHash })
+
+      setRequests((prev) =>
+        prev.map((request) =>
+          request[0] === requestId
+            ? [request[0], request[1], request[2], request[3], true, request[5]]
+            : request
+        ) as ClaimRequestTuple[]
+      )
+
+      toast.success('Claim request accepted')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to accept request')
+    } finally {
+      setAcceptingRequestId(null)
+    }
+  }
+
   if (!address) {
     return null
   }
@@ -644,7 +678,17 @@ export default function IssuerPage() {
                     <div key={`${req[0].toString()}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
                       <p>Requester: {req[1]}</p>
                       <p>Purpose: {req[3]}</p>
-                      <p>Status: {req[4] ? 'Fulfilled' : 'Pending'}</p>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p>Status: {req[4] ? 'Fulfilled' : 'Pending'}</p>
+                        <button
+                          type="button"
+                          className="nh-button-primary rounded-xl px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => void handleAcceptRequest(req[0])}
+                          disabled={req[4] || acceptingRequestId === req[0]}
+                        >
+                          {acceptingRequestId === req[0] ? 'Accepting...' : req[4] ? 'Accepted' : 'Accept'}
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}

@@ -68,6 +68,15 @@ type IssuanceTxDetails = {
   usdEquivalent?: number
 }
 
+const CLAIM_REQUEST_FIELD_OPTIONS = [
+  { label: 'Name', value: 'name' },
+  { label: 'Document Type', value: 'type' },
+  { label: 'Year', value: 'year' },
+  { label: 'Document CID', value: 'documentCid' },
+] as const
+
+type ClaimRequestFieldKey = (typeof CLAIM_REQUEST_FIELD_OPTIONS)[number]['value']
+
 function isAttestationTuple(value: AttestationTuple | AttestationObject): value is AttestationTuple {
   return Array.isArray(value)
 }
@@ -105,7 +114,7 @@ export default function IssuerPage() {
     },
   })
 
-  const { data: requestIds } = useReadContract({
+  const { data: requestIds, refetch: refetchRequestIds } = useReadContract({
     ...interactionHubConfig,
     functionName: 'getRequestsForUser',
     args: address ? [address] : undefined,
@@ -114,7 +123,7 @@ export default function IssuerPage() {
     },
   })
 
-  const { data: attestations } = useReadContract({
+  const { data: attestations, refetch: refetchAttestations } = useReadContract({
     ...interactionHubConfig,
     functionName: 'getAttestations',
     args: address ? [address] : undefined,
@@ -132,10 +141,12 @@ export default function IssuerPage() {
   const [file, setFile] = useState<File | null>(null)
   const [hubTargetAddress, setHubTargetAddress] = useState('')
   const [claimReason, setClaimReason] = useState('')
+  const [claimFields, setClaimFields] = useState<ClaimRequestFieldKey[]>(['type', 'year'])
   const [attestationText, setAttestationText] = useState('')
   const [loading, setLoading] = useState(false)
   const [claimLoading, setClaimLoading] = useState(false)
   const [attestationLoading, setAttestationLoading] = useState(false)
+  const [refreshingHubData, setRefreshingHubData] = useState(false)
   const [acceptingRequestId, setAcceptingRequestId] = useState<bigint | null>(null)
   const [revokingCredentialHash, setRevokingCredentialHash] = useState<`0x${string}` | null>(null)
   const [authenticatingIssue, setAuthenticatingIssue] = useState(false)
@@ -169,6 +180,35 @@ export default function IssuerPage() {
   const credentials = (data ?? []) as Credential[]
   const activeCredentials = credentials.filter((cred) => cred.isValid).length
   const revokedCredentials = credentials.length - activeCredentials
+  const isHubTargetAddressValid = Boolean(hubTargetAddress) && isAddress(hubTargetAddress)
+  const trimmedClaimReason = claimReason.trim()
+  const trimmedAttestationText = attestationText.trim()
+  const pendingRequests = requests.filter((request) => !request[4]).length
+  const fulfilledRequests = requests.length - pendingRequests
+  const attestationCount = Array.isArray(attestations) ? attestations.length : 0
+
+  function toggleClaimField(field: ClaimRequestFieldKey) {
+    setClaimFields((prev) => (
+      prev.includes(field) ? prev.filter((value) => value !== field) : [...prev, field]
+    ))
+  }
+
+  async function handleRefreshHubData() {
+    if (!address) {
+      return
+    }
+
+    try {
+      setRefreshingHubData(true)
+      await Promise.all([refetchRequestIds(), refetchAttestations()])
+      toast.success('Interaction hub refreshed')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to refresh interaction hub')
+    } finally {
+      setRefreshingHubData(false)
+    }
+  }
 
   async function handleExtract() {
     if (!file) {
@@ -444,8 +484,13 @@ export default function IssuerPage() {
       return
     }
 
-    if (!claimReason.trim()) {
+    if (!trimmedClaimReason) {
       toast.info('Enter a claim reason first.')
+      return
+    }
+
+    if (claimFields.length === 0) {
+      toast.info('Select at least one field to request.')
       return
     }
 
@@ -457,12 +502,13 @@ export default function IssuerPage() {
         functionName: 'createClaimRequest',
         args: [
           hubTargetAddress as `0x${string}`,
-          ['type', 'year'],
-          claimReason,
+          claimFields,
+          trimmedClaimReason,
         ],
       })
 
       await waitForTransactionReceipt(config, { hash: txHash })
+      void refetchRequestIds()
       toast.success('Claim Request Sent')
       setClaimReason('')
     } catch (err) {
@@ -483,7 +529,7 @@ export default function IssuerPage() {
       return
     }
 
-    if (!attestationText.trim()) {
+    if (!trimmedAttestationText) {
       toast.info('Enter attestation text first.')
       return
     }
@@ -496,11 +542,12 @@ export default function IssuerPage() {
         functionName: 'createAttestation',
         args: [
           hubTargetAddress as `0x${string}`,
-          attestationText,
+          trimmedAttestationText,
         ],
       })
 
       await waitForTransactionReceipt(config, { hash: txHash })
+      void refetchAttestations()
       toast.success('Attestation Created')
       setAttestationText('')
     } catch (err) {
@@ -534,6 +581,7 @@ export default function IssuerPage() {
             : request
         ) as ClaimRequestTuple[]
       )
+      void refetchRequestIds()
 
       toast.success('Claim request accepted')
     } catch (err) {
@@ -726,54 +774,130 @@ export default function IssuerPage() {
           </section>
 
           <section className="nh-panel rounded-md p-5 sm:p-6">
-            <h3 className="text-lg font-semibold text-orange-50">Interaction Hub</h3>
-            <p className="mt-1 text-sm nh-text-muted">
-              Create claim requests and attestations for a target wallet.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-orange-50">Interaction Hub</h3>
+                <p className="mt-1 text-sm nh-text-muted">
+                  Create claim requests and attestations for a target wallet.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="nh-button-secondary rounded-xl px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void handleRefreshHubData()}
+                disabled={refreshingHubData || claimLoading || attestationLoading}
+              >
+                {refreshingHubData ? 'Refreshing...' : 'Refresh Hub'}
+              </button>
+            </div>
 
-            <div className="mt-5 space-y-3">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                <p className="text-xs uppercase tracking-wide text-orange-100/70">Pending Requests</p>
+                <p className="mt-1 text-lg font-semibold text-orange-50">{pendingRequests}</p>
+              </div>
+              <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                <p className="text-xs uppercase tracking-wide text-orange-100/70">Fulfilled Requests</p>
+                <p className="mt-1 text-lg font-semibold text-orange-50">{fulfilledRequests}</p>
+              </div>
+              <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                <p className="text-xs uppercase tracking-wide text-orange-100/70">Attestations</p>
+                <p className="mt-1 text-lg font-semibold text-orange-50">{attestationCount}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div>
                 <input
                   className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
                   placeholder="Target Wallet Address"
                   value={hubTargetAddress}
                   onChange={(event) => setHubTargetAddress(event.target.value)}
                 />
-                <div className="hidden md:block" />
+                <p
+                  className={`mt-1 text-xs ${
+                    hubTargetAddress
+                      ? isHubTargetAddressValid
+                        ? 'text-emerald-300/90'
+                        : 'text-rose-300/90'
+                      : 'nh-text-muted'
+                  }`}
+                >
+                  {hubTargetAddress
+                    ? isHubTargetAddressValid
+                      ? 'Valid target wallet.'
+                      : 'Enter a valid 0x wallet address.'
+                    : 'The target wallet is used for both claim requests and attestations.'}
+                </p>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
-                <input
-                  className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
-                  placeholder="Claim Reason"
-                  value={claimReason}
-                  onChange={(event) => setClaimReason(event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={handleClaimRequest}
-                  disabled={claimLoading || attestationLoading}
-                >
-                  {claimLoading ? 'Sending...' : 'Send Claim Request'}
-                </button>
+              <div className="rounded-xl border border-orange-300/20 bg-black/20 p-4">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
+                  <input
+                    className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
+                    placeholder="Claim reason (e.g., verification for internship)."
+                    value={claimReason}
+                    onChange={(event) => setClaimReason(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={handleClaimRequest}
+                    disabled={
+                      claimLoading ||
+                      attestationLoading ||
+                      !isHubTargetAddressValid ||
+                      !trimmedClaimReason ||
+                      claimFields.length === 0
+                    }
+                  >
+                    {claimLoading ? 'Sending...' : 'Send Claim Request'}
+                  </button>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Requested fields</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {CLAIM_REQUEST_FIELD_OPTIONS.map((field) => (
+                      <label
+                        key={field.value}
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
+                          claimFields.includes(field.value)
+                            ? 'border-orange-300/70 bg-orange-300/15 text-orange-50'
+                            : 'border-orange-300/30 bg-black/20 text-orange-100/80'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 accent-orange-400"
+                          checked={claimFields.includes(field.value)}
+                          onChange={() => toggleClaimField(field.value)}
+                        />
+                        <span>{field.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
-                <input
-                  className="nh-input w-full rounded-xl px-3 py-2.5 text-sm"
-                  placeholder="Attestation Text"
-                  value={attestationText}
-                  onChange={(event) => setAttestationText(event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={handleAttestation}
-                  disabled={claimLoading || attestationLoading}
-                >
-                  {attestationLoading ? 'Submitting...' : 'Create Attestation'}
-                </button>
+              <div className="rounded-xl border border-orange-300/20 bg-black/20 p-4">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem]">
+                  <textarea
+                    className="nh-input min-h-[104px] w-full rounded-xl px-3 py-2.5 text-sm"
+                    placeholder="Attestation text (max 280 characters)."
+                    value={attestationText}
+                    onChange={(event) => setAttestationText(event.target.value)}
+                    maxLength={280}
+                  />
+                  <button
+                    type="button"
+                    className="nh-button-secondary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={handleAttestation}
+                    disabled={claimLoading || attestationLoading || !isHubTargetAddressValid || !trimmedAttestationText}
+                  >
+                    {attestationLoading ? 'Submitting...' : 'Create Attestation'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-orange-100/70">{attestationText.length}/280 characters</p>
               </div>
             </div>
           </section>
@@ -785,23 +909,30 @@ export default function IssuerPage() {
                 {requests.length === 0 ? (
                   <p className="text-sm nh-text-muted">No incoming requests yet.</p>
                 ) : (
-                  requests.map((req, index) => (
-                    <div key={`${req[0].toString()}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
-                      <p>Requester: {req[1]}</p>
-                      <p>Purpose: {req[3]}</p>
-                      <div className="mt-3 flex items-center justify-between gap-3">
-                        <p>Status: {req[4] ? 'Fulfilled' : 'Pending'}</p>
-                        <button
-                          type="button"
-                          className="nh-button-primary rounded-xl px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() => void handleAcceptRequest(req[0])}
-                          disabled={req[4] || acceptingRequestId === req[0]}
-                        >
-                          {acceptingRequestId === req[0] ? 'Accepting...' : req[4] ? 'Accepted' : 'Accept'}
-                        </button>
+                  requests.map((req, index) => {
+                    const createdAtLabel = req[5] > BigInt(0) ? new Date(Number(req[5]) * 1000).toLocaleString() : '-'
+
+                    return (
+                      <div key={`${req[0].toString()}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                        <p className="text-xs uppercase tracking-wide text-orange-100/70">Request #{req[0].toString()}</p>
+                        <p className="mt-2 break-all font-mono text-xs text-orange-100/85">Requester: {req[1]}</p>
+                        <p className="mt-1 break-all font-mono text-xs text-orange-100/85">Subject: {req[2]}</p>
+                        <p className="mt-2 text-orange-100/90">Purpose: {req[3]}</p>
+                        <p className="mt-1 text-xs text-orange-100/70">Created: {createdAtLabel}</p>
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <p>Status: {req[4] ? 'Fulfilled' : 'Pending'}</p>
+                          <button
+                            type="button"
+                            className="nh-button-primary rounded-xl px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => void handleAcceptRequest(req[0])}
+                            disabled={req[4] || acceptingRequestId === req[0]}
+                          >
+                            {acceptingRequestId === req[0] ? 'Accepting...' : req[4] ? 'Accepted' : 'Accept'}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -814,12 +945,20 @@ export default function IssuerPage() {
                 ) : (
                   (attestations as readonly (AttestationTuple | AttestationObject)[]).map((att, index) => {
                     const from = isAttestationTuple(att) ? att[0] : att.attester
+                    const to = isAttestationTuple(att) ? att[1] : undefined
                     const statement = isAttestationTuple(att) ? att[2] : att.statement
+                    const timestamp = isAttestationTuple(att) ? att[3] : undefined
+                    const createdAtLabel =
+                      typeof timestamp === 'bigint' && timestamp > BigInt(0)
+                        ? new Date(Number(timestamp) * 1000).toLocaleString()
+                        : '-'
 
                     return (
                       <div key={`${from ?? 'att'}-${index}`} className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
-                        <p>From: {from ?? '-'}</p>
-                        <p>{statement ?? '-'}</p>
+                        <p className="break-all font-mono text-xs text-orange-100/85">From: {from ?? '-'}</p>
+                        {to ? <p className="mt-1 break-all font-mono text-xs text-orange-100/85">To: {to}</p> : null}
+                        <p className="mt-2 text-orange-100/90">{statement ?? '-'}</p>
+                        <p className="mt-1 text-xs text-orange-100/70">Created: {createdAtLabel}</p>
                       </div>
                     )
                   })

@@ -48,12 +48,13 @@ function VerifyPageContent() {
   const hashParam = searchParams.get('hash')
 
   const [disclosedData, setDisclosedData] = useState<DisclosedData | null>(null)
+  const [disclosedCredentialIndex, setDisclosedCredentialIndex] = useState<number | null>(null)
   const [inputAddress, setInputAddress] = useState('')
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [issuerTrustMap, setIssuerTrustMap] = useState<Record<string, boolean>>({})
   const [verificationResult, setVerificationResult] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [biometricLoading, setBiometricLoading] = useState(false)
+  const [biometricLoadingIndex, setBiometricLoadingIndex] = useState<number | null>(null)
 
   async function checkIssuerTrust(issuer: `0x${string}`) {
     try {
@@ -103,6 +104,7 @@ function VerifyPageContent() {
     try {
       setLoading(true)
       setDisclosedData(null)
+      setDisclosedCredentialIndex(null)
       setVerificationResult(null)
 
       const data = await readContract(config, {
@@ -181,8 +183,8 @@ function VerifyPageContent() {
     }
   }
 
-  async function authenticateBiometric() {
-    setBiometricLoading(true)
+  async function authenticateBiometric(index: number) {
+    setBiometricLoadingIndex(index)
 
     try {
       const result = await authenticateWithBiometric(inputAddress || 'neuralhash-verifier')
@@ -197,13 +199,13 @@ function VerifyPageContent() {
       toast.error('Biometric authentication failed.')
       return false
     } finally {
-      setBiometricLoading(false)
+      setBiometricLoadingIndex(null)
     }
   }
 
   // ---------------- SELECTIVE DISCLOSURE ----------------
   async function selectiveDisclosure(index: number) {
-    const isAuthenticated = await authenticateBiometric()
+    const isAuthenticated = await authenticateBiometric(index)
     if (!isAuthenticated) {
       return
     }
@@ -219,6 +221,7 @@ function VerifyPageContent() {
       const credentialData = json?.credential ?? json
 
       if (!credentialData || typeof credentialData !== 'object') {
+        setDisclosedCredentialIndex(index)
         setDisclosedData({})
         return
       }
@@ -232,6 +235,7 @@ function VerifyPageContent() {
         dynamicFields[key] = value
       })
 
+      setDisclosedCredentialIndex(index)
       setDisclosedData(dynamicFields)
 
     } catch (err) {
@@ -323,22 +327,6 @@ function VerifyPageContent() {
             </div>
           </section>
 
-          {disclosedData && (
-            <section className="nh-panel rounded-lg p-5 sm:p-6">
-              <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Selectively Disclosed Information</h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {Object.entries(disclosedData).map(([key, value]) => (
-                  <div key={key} className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
-                    <span className="font-semibold capitalize text-orange-50">{key}:</span>{' '}
-                    {typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-                      ? String(value)
-                      : JSON.stringify(value)}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
           <section className="nh-panel rounded-lg p-5 sm:p-6">
             <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Credential Records</h3>
             <p className="mt-1 text-sm nh-text-muted">Verify cryptographic integrity before accepting any claim.</p>
@@ -392,11 +380,27 @@ function VerifyPageContent() {
                     <button
                       className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold transition"
                       onClick={() => selectiveDisclosure(index)}
-                      disabled={biometricLoading}
+                      disabled={biometricLoadingIndex !== null}
                     >
-                      {biometricLoading ? 'Authenticating...' : 'Selective Disclosure'}
+                      {biometricLoadingIndex === index ? 'Authenticating...' : 'Selective Disclosure'}
                     </button>
                   </div>
+
+                  {disclosedData && disclosedCredentialIndex === index && (
+                    <div className="mt-4">
+                      <p className="text-lg font-semibold text-orange-50">Selectively Disclosed Information</p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {Object.entries(disclosedData).map(([key, value]) => (
+                          <div key={key} className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
+                            <span className="font-semibold capitalize text-orange-50">{key}:</span>{' '}
+                            {typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+                              ? String(value)
+                              : JSON.stringify(value)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>

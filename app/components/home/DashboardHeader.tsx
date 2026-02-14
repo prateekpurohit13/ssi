@@ -2,7 +2,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 export function DashboardHeader() {
   return (
-    <div className="rounded-md p-4 shadow-[0_15px_40px_rgba(0,0,0,0.45)] sm:p-6">
+    <div className="rounded-md p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-4xl font-black text-orange-50 sm:text-3xl">

@@ -237,24 +237,25 @@ export default function IssuerPage() {
 
           <DashboardHeader />
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                disconnect()
-                router.replace('/')
-              }}
-              className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition"
-            >
-              Disconnect
-            </button>
-          </div>
-
-          <section className=" relative overflow-hidden rounded-xl p-6 sm:p-6">
-            <div className="max-w-2xl">
+          <section className=" relative overflow-hidden rounded-xl px-6 pb-6 pt-2 sm:px-6 sm:pb-6 sm:pt-2">
+            <div className="flex items-start justify-between gap-4">
               <p className="nh-chip inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide">
                 NeuralHash Issuer Space
               </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  disconnect()
+                  router.replace('/')
+                }}
+                className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition"
+              >
+                Disconnect
+              </button>
+            </div>
+
+            <div className="max-w-2xl">
               <h2 className="mt-4 text-4xl font-black leading-tight text-orange-50 sm:text-5xl">
                 the credential hub
                 <span className="block bg-linear-to-r from-orange-400/25 to-transparent px-2 text-orange-200">for modern SSI workflows</span>

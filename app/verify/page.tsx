@@ -3,9 +3,9 @@
 import { Suspense } from 'react'
 import { useState, useEffect } from 'react'
 import { readContract } from 'wagmi/actions'
-import { useConfig } from 'wagmi'
+import { useConfig, useDisconnect } from 'wagmi'
 import { keccak256, stringToBytes } from 'viem'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { contractConfig } from '../contract'
 import { authenticateWithBiometric } from '../biometricAuth'
 import { ViewToggle } from '../components/home/ViewToggle'
@@ -40,6 +40,8 @@ export default function VerifyPage() {
 
 function VerifyPageContent() {
   const config = useConfig()
+  const { disconnect } = useDisconnect()
+  const router = useRouter()
   const searchParams = useSearchParams()
 
   const userParam = searchParams.get('user')
@@ -211,10 +213,24 @@ function VerifyPageContent() {
           </div>
 
           <section className=" relative overflow-hidden rounded-xl p-6 sm:p-8">
-            <div className="max-w-2xl">
+            <div className="flex items-start justify-between gap-4">
               <p className="nh-chip inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide">
                 NeuralHash Verifier Space
               </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  disconnect()
+                  router.replace('/')
+                }}
+                className="nh-button-secondary rounded-xl px-4 py-2 text-sm font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition"
+              >
+                Disconnect
+              </button>
+            </div>
+
+            <div className="max-w-2xl">
               <h2 className="mt-4 text-4xl font-black leading-tight text-orange-50 sm:text-5xl">
                 verify with confidence
                 <span className="mt-1  px-2 text-orange-200">without revealing everything</span>
@@ -257,19 +273,19 @@ function VerifyPageContent() {
 
           {verificationResult && (
             <section className="nh-panel rounded-lg p-5 sm:p-6">
-              <p className="text-lg font-semibold text-orange-50">Verification Result</p>
-              <p className="mt-2 text-sm text-orange-100/85">{verificationResult}</p>
+              <p className="text-2xl font-bold text-orange-50 sm:text-3xl">Verification Result</p>
+              <p className="mt-2 text-lg text-orange-100/85">{verificationResult}</p>
             </section>
           )}
 
           {disclosedData && (
             <section className="nh-panel rounded-lg p-5 sm:p-6">
-              <h3 className="text-lg font-semibold text-orange-50">Selectively Disclosed Information</h3>
+              <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Selectively Disclosed Information</h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-sm text-orange-100/85">
+                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
                   <span className="font-semibold text-orange-50">Type:</span> {disclosedData.type}
                 </div>
-                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-sm text-orange-100/85">
+                <div className="nh-glass rounded-lg border border-orange-400/28 p-3 text-md text-orange-100/85">
                   <span className="font-semibold text-orange-50">Year:</span> {disclosedData.year}
                 </div>
               </div>
@@ -277,7 +293,7 @@ function VerifyPageContent() {
           )}
 
           <section className="nh-panel rounded-lg p-5 sm:p-6">
-            <h3 className="text-lg font-semibold text-orange-50">Credential Records</h3>
+            <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Credential Records</h3>
             <p className="mt-1 text-sm nh-text-muted">Verify cryptographic integrity before accepting any claim.</p>
             <p className="mt-1 text-xs text-orange-100/70">Selective disclosure requires biometric authentication.</p>
 

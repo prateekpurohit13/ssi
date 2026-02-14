@@ -2,11 +2,13 @@ function StatCard({
   label,
   value,
   accent,
+  valueClassName,
   compact = false,
 }: {
   label: string
   value: string
   accent: string
+  valueClassName?: string
   compact?: boolean
 }) {
   return (
@@ -14,7 +16,7 @@ function StatCard({
       className={` p-4 ${accent} ${compact ? 'flex h-full w-full min-w-55 max-w-full flex-col justify-center' : ''}`}
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-orange-100/70">{label}</p>
-      <p className="mt-2 text-2xl font-black text-orange-50">{value}</p>
+      <p className={`mt-2 text-2xl font-black ${valueClassName ?? 'text-orange-50'}`}>{value}</p>
     </div>
   )
 }
@@ -46,24 +48,28 @@ export function StatsGrid({
         label="Wallet"
         value={walletConnected ? 'Connected' : 'Not connected'}
         accent="nh-glass"
+        valueClassName={walletConnected ? 'text-emerald-300' : 'text-rose-300'}
         compact={isStackLayout}
       />
       <StatCard
         label="Total Credentials"
         value={String(totalCredentials)}
         accent="nh-glass"
+        valueClassName="text-blue-400"
         compact={isStackLayout}
       />
       <StatCard
         label="Active"
         value={String(activeCredentials)}
         accent="nh-glass"
+        valueClassName="text-green-400"
         compact={isStackLayout}
       />
       <StatCard
         label="Revoked"
         value={String(revokedCredentials)}
         accent="nh-glass"
+        valueClassName="text-red-400"
         compact={isStackLayout}
       />
     </div>

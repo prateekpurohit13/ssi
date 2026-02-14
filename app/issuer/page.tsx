@@ -24,6 +24,7 @@ import { CredentialsSection } from '../components/home/CredentialsSection'
 import { BlockchainAnalyticsSection } from '../components/home/BlockchainAnalyticsSection'
 import { ViewToggle } from '../components/home/ViewToggle'
 import ColorBends from '../components/home/ColorBends'
+import DecryptedText from '../components/home/DecryptedText'
 import type { Credential } from '../components/home/types'
 import { useToast } from '../components/ui/ToastProvider'
 import {
@@ -516,7 +517,18 @@ export default function IssuerPage() {
             <div className="max-w-2xl">
               <h2 className="mt-4 text-4xl font-black leading-tight text-orange-50 sm:text-5xl">
                 the credential hub
-                <span className="block bg-linear-to-r from-orange-400/25 to-transparent px-2 text-orange-200">for modern SSI workflows</span>
+                <span className="block bg-linear-to-r from-orange-400/25 to-transparent px-2 text-orange-200">
+                  <DecryptedText
+                    text="for modern SSI workflows"
+                    animateOn="view"
+                    sequential={true}
+                    revealDirection="start"
+                    speed={35}
+                    className="text-orange-200"
+                    encryptedClassName="text-orange-200/45"
+                    parentClassName="block"
+                  />
+                </span>
               </h2>
               <p className="mt-4 text-sm nh-text-muted sm:text-base">
                 Keep issuing, revoking, and sharing verifiable credentials with a clean dashboard flow.

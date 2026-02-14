@@ -67,6 +67,7 @@ export function IssueCredentialSection({
 
       <label className="mt-5 block space-y-3">
         <span className="text-base font-semibold text-orange-100/90">Document Type</span>
+        <br />
         <select
           className="nh-input w-full rounded-xl px-3 py-2.5 text-base"
           value={selectedDocumentType}
@@ -119,6 +120,7 @@ export function IssueCredentialSection({
 
       <label className="mt-5 block space-y-3">
         <span className="text-base font-semibold text-orange-100/90">Recipient Address (Optional)</span>
+        <br />
         <input
           className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
           placeholder="0x... (defaults to your wallet)"

@@ -117,3 +117,13 @@ body {
 .nh-button-secondary:hover {
   background: rgba(255, 118, 49, 0.18);
 }
+
+@keyframes texttype-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}

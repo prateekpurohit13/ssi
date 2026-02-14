@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import ColorBends from './components/home/ColorBends'
+import TextType from './components/home/TextType'
 
 export default function Home() {
   const { address } = useAccount()
@@ -37,14 +38,39 @@ export default function Home() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
         <main className="space-y-8">
           <div className="max-w-3xl">
-            <p className="inline-block rounded-full border border-orange-300/35 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-100/90">
-              NeuralHash SSI
-            </p>
+            <div className="inline-flex items-center gap-3 rounded-2xl border border-orange-300/35 bg-black/25 px-4 py-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-xl border border-orange-300/45 bg-linear-to-br from-orange-500/30 to-orange-700/20">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 text-orange-200" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6.5" y="10" width="11" height="9" rx="2" />
+                  <path d="M9 10V7.8a3 3 0 0 1 6 0V10" />
+                  <circle cx="12" cy="14.5" r="0.8" fill="currentColor" stroke="none" />
+                  <path d="M12 15.3v1.5" />
+                  <circle cx="4" cy="12" r="1.2" />
+                  <circle cx="20" cy="12" r="1.2" />
+                  <circle cx="12" cy="3.5" r="1.2" />
+                  <path d="M5.2 12h1.3M17.5 12h1.3M12 4.7V6" />
+                </svg>
+              </span>
+              <span className="font-mono text-base font-bold tracking-[0.16em] text-orange-100/95 sm:text-lg">
+                NeuralHash
+                <span className="ml-2 text-base font-bold tracking-[0.28em] text-orange-200/85 sm:text-lg">SSI</span>
+              </span>
+            </div>
             <h1 className="mt-6 text-4xl font-black leading-tight text-white sm:text-6xl">
-              Issue and verify trusted credentials
-              <span className="block text-orange-300">with decentralized identity</span>
+              <TextType
+                as="span"
+                text={['Issue and verify trusted credentials', 'with decentralized identity']}
+                textColors={['#ffffff', '#fdba74']}
+                className="block"
+                typingSpeed={42}
+                initialDelay={100}
+                loop={false}
+                showCursor={true}
+                hideCursorWhileTyping={false}
+                hideCursorOnComplete={true}
+              />
             </h1>
-            <p className="mt-4 max-w-2xl text-sm text-orange-100/80 sm:text-base">
+            <p className="mt-4 max-w-2xl font-mono text-sm text-orange-100/80 sm:text-base">
               Create tamper-evident credentials, store proofs on IPFS, and verify authenticity with cryptographic confidence.
             </p>
           </div>
@@ -54,12 +80,7 @@ export default function Home() {
               <ConnectButton label="Connect Wallet" />
             </div>
           </div>
-
-          <section className="grid gap-3 text-sm text-orange-100/85 sm:grid-cols-3">
-            <p>Issue credentials securely</p>
-            <p>Store hashes and metadata on-chain + IPFS</p>
-            <p>Verify authenticity in one flow</p>
-          </section>
+          <p className="text-sm text-orange-100/80 font-mono sm:text-base">Issue credentials securely, Store hashes and metadata on-chain + IPFS, Verify authenticity in one flow</p>
         </main>
       </div>
     </div>

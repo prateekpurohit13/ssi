@@ -6,6 +6,7 @@ import { WagmiProvider } from 'wagmi'
 import { sepolia } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactNode, useSyncExternalStore } from 'react'
+import { ToastProvider } from './components/ui/ToastProvider'
 
 const config = getDefaultConfig({
   appName: 'NeuralHash',
@@ -23,7 +24,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        {mounted ? <RainbowKitProvider>{children}</RainbowKitProvider> : children}
+        <ToastProvider>
+          {mounted ? <RainbowKitProvider>{children}</RainbowKitProvider> : children}
+        </ToastProvider>
       </QueryClientProvider>
     </WagmiProvider>
   )

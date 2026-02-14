@@ -11,6 +11,7 @@ import { trustRegistryConfig } from '../trustRegistry'
 import { authenticateWithBiometric } from '../biometricAuth'
 import { ViewToggle } from '../components/home/ViewToggle'
 import ColorBends from '../components/home/ColorBends'
+import { useToast } from '../components/ui/ToastProvider'
 
 type Credential = {
   ipfsCID: string
@@ -41,6 +42,7 @@ function VerifyPageContent() {
   const { disconnect } = useDisconnect()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const toast = useToast()
 
   const userParam = searchParams.get('user')
   const hashParam = searchParams.get('hash')
@@ -185,14 +187,14 @@ function VerifyPageContent() {
     try {
       const result = await authenticateWithBiometric(inputAddress || 'neuralhash-verifier')
       if (!result.ok) {
-        alert(result.message)
+        toast.error(result.message)
         return false
       }
 
       return true
     } catch (err) {
       console.error(err)
-      alert('Biometric authentication failed.')
+      toast.error('Biometric authentication failed.')
       return false
     } finally {
       setBiometricLoading(false)

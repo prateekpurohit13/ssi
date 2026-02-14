@@ -11,7 +11,7 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-md border border-orange-200/20 p-4 shadow-[0_10px_28px_rgba(0,0,0,0.35)] ${accent} ${compact ? 'flex h-full w-full min-w-55 max-w-full flex-col justify-center' : ''}`}
+      className={` p-4 ${accent} ${compact ? 'flex h-full w-full min-w-55 max-w-full flex-col justify-center' : ''}`}
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-orange-100/70">{label}</p>
       <p className="mt-2 text-2xl font-black text-orange-50">{value}</p>

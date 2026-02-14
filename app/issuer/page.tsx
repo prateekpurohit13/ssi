@@ -15,7 +15,7 @@ import { isAddress, keccak256, stringToBytes } from 'viem'
 import { contractConfig } from '../contract'
 import { trustRegistryConfig } from '../trustRegistry'
 import { authenticateWithBiometric } from '../biometricAuth'
-import { uploadToIPFS } from '../ipfs'
+import { uploadFileToIPFS, uploadToIPFS } from '../ipfs'
 import { DashboardHeader } from '../components/home/DashboardHeader'
 import { StatsGrid } from '../components/home/StatsGrid'
 import { IssueCredentialSection } from '../components/home/IssueCredentialSection'
@@ -24,6 +24,13 @@ import { BlockchainAnalyticsSection } from '../components/home/BlockchainAnalyti
 import { ViewToggle } from '../components/home/ViewToggle'
 import ColorBends from '../components/home/ColorBends'
 import type { Credential } from '../components/home/types'
+import { useToast } from '../components/ui/ToastProvider'
+import {
+  DOCUMENT_SCHEMAS,
+  DOCUMENT_TYPE_OPTIONS,
+  normalizeDocumentType,
+  type SupportedDocumentType,
+} from '../documentSchemas'
 
 export default function IssuerPage() {
   const { address } = useAccount()
@@ -31,6 +38,7 @@ export default function IssuerPage() {
   const { disconnect } = useDisconnect()
   const router = useRouter()
   const config = useConfig()
+  const toast = useToast()
 
   useEffect(() => {
     if (!address) {
@@ -58,9 +66,9 @@ export default function IssuerPage() {
 
   const { writeContractAsync } = useWriteContract()
 
-  const [name, setName] = useState('')
-  const [type, setType] = useState('')
-  const [year, setYear] = useState('')
+  const [selectedDocumentType, setSelectedDocumentType] = useState<SupportedDocumentType>('10th Marksheet')
+  const [extractedFields, setExtractedFields] = useState<Record<string, string>>({})
+  const [selectedFieldKeys, setSelectedFieldKeys] = useState<string[]>([])
   const [recipient, setRecipient] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
@@ -74,7 +82,7 @@ export default function IssuerPage() {
 
   async function handleExtract() {
     if (!file) {
-      alert('Upload a PDF first')
+      toast.info('Upload a PDF first')
       return
     }
 
@@ -91,23 +99,52 @@ export default function IssuerPage() {
 
       const result = await res.json()
 
+      if (res.status === 429 || result.code === 'QUOTA_EXCEEDED') {
+        toast.error(result.error ?? 'Gemini quota exceeded. Please retry later.')
+        return
+      }
+
       if (!res.ok || result.error) {
         throw new Error(result.error ?? 'Extraction failed')
       }
 
       if (!result.data) {
-        alert('Extraction failed')
+        toast.error('Extraction failed')
         return
       }
 
-      setName(result.data.name ?? '')
-      setType(result.data.documentType ?? '')
-      setYear(result.data.year ?? '')
+      const extractedType = normalizeDocumentType(result.data.documentType ?? '')
 
-      alert('Data extracted successfully!')
+      if (!extractedType) {
+        toast.error('Could not identify document type from uploaded file.')
+        setExtractedFields({})
+        return
+      }
+
+      if (extractedType !== selectedDocumentType) {
+        toast.error(`Wrong document uploaded. You selected ${selectedDocumentType}, but detected ${extractedType}.`)
+        setExtractedFields({})
+        return
+      }
+
+      const schemaFields = DOCUMENT_SCHEMAS[selectedDocumentType]
+      const incomingFields = (result.data.fields ?? {}) as Record<string, string>
+
+      const mappedFields = schemaFields.reduce<Record<string, string>>((acc, fieldKey) => {
+        const value = incomingFields[fieldKey]
+        acc[fieldKey] = typeof value === 'string' ? value : ''
+        return acc
+      }, {})
+
+      setExtractedFields(mappedFields)
+      setSelectedFieldKeys(
+        schemaFields.filter((fieldKey) => Boolean(mappedFields[fieldKey]?.trim()))
+      )
+
+      toast.success('Data extracted successfully!')
     } catch (err) {
       console.error(err)
-      alert(err instanceof Error ? err.message : 'Extraction error')
+      toast.error(err instanceof Error ? err.message : 'Extraction error')
     } finally {
       setLoading(false)
     }
@@ -129,21 +166,64 @@ export default function IssuerPage() {
     setAuthenticatingIssue(false)
 
     if (!biometricResult.ok) {
-      alert(biometricResult.message)
+      toast.error(biometricResult.message)
       return
     }
 
     try {
       setLoading(true)
+
+      if (!file) {
+        toast.info('Upload a document first.')
+        return
+      }
+
+      const requiredFields = DOCUMENT_SCHEMAS[selectedDocumentType]
+      const hasAnyExtractedValue = requiredFields.some((fieldKey) => Boolean(extractedFields[fieldKey]?.trim()))
+
+      if (!hasAnyExtractedValue) {
+        toast.info('Extract data from the uploaded document before issuing credential.')
+        return
+      }
+
+      const selectedFields = selectedFieldKeys.reduce<Record<string, string>>((acc, fieldKey) => {
+        const value = extractedFields[fieldKey]?.trim()
+        if (value) {
+          acc[fieldKey] = value
+        }
+        return acc
+      }, {})
+
+      if (Object.keys(selectedFields).length === 0) {
+        toast.info('Select at least one extracted field to include in the credential.')
+        return
+      }
+
       const targetAddress =
         recipient && isAddress(recipient)
           ? (recipient as `0x${string}`)
           : address
 
+      const documentCid = await uploadFileToIPFS(file)
+
+      const primaryName =
+        selectedFields.full_name ||
+        selectedFields.student_name ||
+        ''
+
+      const yearOfRecord =
+        selectedFields.year_of_passing ||
+        selectedFields.date_of_birth ||
+        ''
+
       const credential = {
-        name,
-        type,
-        year,
+        name: primaryName,
+        type: selectedDocumentType,
+        year: yearOfRecord,
+        documentType: selectedDocumentType,
+        fields: selectedFields,
+        documentCid,
+        documentName: file.name,
         issuedTo: targetAddress,
         timestamp: new Date().toISOString(),
       }
@@ -162,17 +242,16 @@ export default function IssuerPage() {
 
       await waitForTransactionReceipt(config, { hash: txHash })
 
-      setName('')
-      setType('')
-      setYear('')
+      setExtractedFields({})
+      setSelectedFieldKeys([])
       setRecipient('')
       setFile(null)
 
       await refetch()
-      alert('Credential Issued Successfully!')
+      toast.success('Credential Issued Successfully!')
     } catch (err) {
       console.error(err)
-      alert('Error issuing credential')
+      toast.error('Error issuing credential')
     } finally {
       setLoading(false)
     }
@@ -194,7 +273,7 @@ export default function IssuerPage() {
     setAuthenticatingRevokeHash(null)
 
     if (!biometricResult.ok) {
-      alert(biometricResult.message)
+      toast.error(biometricResult.message)
       return
     }
 
@@ -210,10 +289,10 @@ export default function IssuerPage() {
       await waitForTransactionReceipt(config, { hash: txHash })
 
       await refetch()
-      alert('Credential Revoked Successfully')
+      toast.success('Credential Revoked Successfully')
     } catch (err) {
       console.error(err)
-      alert('Revoke Failed')
+      toast.error('Revoke Failed')
     } finally {
       setRevokingCredentialHash(null)
       setAuthenticatingRevokeHash(null)
@@ -250,12 +329,18 @@ export default function IssuerPage() {
 
           <DashboardHeader />
 
-          <section className="nh-panel rounded-md p-4 sm:p-5">
-            <p className="text-sm font-semibold text-orange-50">Trust Registry</p>
-            <p className="mt-1 text-sm text-orange-100/80">
-              {trustLoading
-                ? 'Checking issuer trust status...'
-                : `Current issuer status: ${trustStatus ? 'Trusted ✅' : 'Not Trusted ❌'}`}
+          <section className="px-6 sm:px-6">
+            <p className="inline-flex items-center gap-2 text-sm text-orange-100/80 sm:text-base">
+              <span>Current user status:</span>
+              {trustLoading ? (
+                <span className="font-semibold text-orange-100">Checking...</span>
+              ) : trustStatus ? (
+                <span className="font-extrabold text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.65)]">
+                  Trusted
+                </span>
+              ) : (
+                <span className="font-semibold text-rose-300">Not Trusted</span>
+              )}
             </p>
           </section>
 
@@ -290,16 +375,33 @@ export default function IssuerPage() {
 
           <section className="grid gap-6 lg:grid-cols-[minmax(0,4.2fr)_minmax(200px,1fr)]">
             <IssueCredentialSection
-              name={name}
-              type={type}
-              year={year}
+              selectedDocumentType={selectedDocumentType}
+              documentTypeOptions={DOCUMENT_TYPE_OPTIONS}
+              fieldKeys={[...DOCUMENT_SCHEMAS[selectedDocumentType]]}
+              extractedFields={extractedFields}
+              selectedFieldKeys={selectedFieldKeys}
               recipient={recipient}
               file={file}
               loading={loading}
               authenticating={authenticatingIssue}
-              onNameChange={setName}
-              onTypeChange={setType}
-              onYearChange={setYear}
+              onDocumentTypeChange={(nextType) => {
+                setSelectedDocumentType(nextType)
+                setExtractedFields({})
+                setSelectedFieldKeys([])
+              }}
+              onFieldSelectionChange={(fieldKey, checked) => {
+                setSelectedFieldKeys((prev) => {
+                  if (checked) {
+                    if (prev.includes(fieldKey)) {
+                      return prev
+                    }
+
+                    return [...prev, fieldKey]
+                  }
+
+                  return prev.filter((key) => key !== fieldKey)
+                })
+              }}
               onRecipientChange={setRecipient}
               onFileChange={setFile}
               onExtract={handleExtract}

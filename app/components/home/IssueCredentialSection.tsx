@@ -1,37 +1,42 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { SupportedDocumentType } from '../../documentSchemas'
+import { formatFieldLabel } from '../../documentSchemas'
 
 export function IssueCredentialSection({
-  name,
-  type,
-  year,
+  selectedDocumentType,
+  documentTypeOptions,
+  fieldKeys,
+  extractedFields,
+  selectedFieldKeys,
   recipient,
   file,
   loading,
   authenticating,
-  onNameChange,
-  onTypeChange,
-  onYearChange,
+  onDocumentTypeChange,
+  onFieldSelectionChange,
   onRecipientChange,
   onFileChange,
   onExtract,
   onIssue,
 }: {
-  name: string
-  type: string
-  year: string
+  selectedDocumentType: SupportedDocumentType
+  documentTypeOptions: SupportedDocumentType[]
+  fieldKeys: string[]
+  extractedFields: Record<string, string>
+  selectedFieldKeys: string[]
   recipient: string
   file: File | null
   loading: boolean
   authenticating: boolean
-  onNameChange: (value: string) => void
-  onTypeChange: (value: string) => void
-  onYearChange: (value: string) => void
+  onDocumentTypeChange: (value: SupportedDocumentType) => void
+  onFieldSelectionChange: (fieldKey: string, checked: boolean) => void
   onRecipientChange: (value: string) => void
   onFileChange: (value: File | null) => void
   onExtract: () => void
   onIssue: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!file && fileInputRef.current) {
@@ -39,75 +44,118 @@ export function IssueCredentialSection({
     }
   }, [file])
 
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrl(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [file])
+
   return (
     <section className="nh-panel rounded-md p-5 sm:p-6">
-      <h3 className="text-lg font-semibold text-orange-50">Issue Credential</h3>
-      <p className="mt-1 text-sm nh-text-muted">
+      <h3 className="text-xl font-semibold text-orange-50">Issue Credential</h3>
+      <p className="mt-1 text-base nh-text-muted">
         Create a new verifiable credential and anchor it with IPFS + blockchain hash.
       </p>
 
+      <label className="mt-5 block space-y-3">
+        <span className="text-base font-semibold text-orange-100/90">Document Type</span>
+        <select
+          className="nh-input w-full rounded-xl px-3 py-2.5 text-base"
+          value={selectedDocumentType}
+          onChange={(event) => onDocumentTypeChange(event.target.value as SupportedDocumentType)}
+          disabled={loading || authenticating}
+        >
+          {documentTypeOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <div className="nh-glass mt-5 rounded-md border border-dashed border-orange-200/20 p-4">
-        <p className="text-sm font-semibold text-orange-100">Auto-fill from PDF</p>
+        <p className="text-base font-semibold text-orange-100">Auto-fill from PDF</p>
         <input
           ref={fileInputRef}
           type="file"
           accept="application/pdf"
-          className="nh-input mt-3 block w-full rounded-xl px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-orange-500/20 file:px-3 file:py-1.5 file:font-semibold file:text-orange-100 hover:file:bg-orange-500/30"
+          className="nh-input mt-3 block w-full rounded-xl px-3 py-2.5 text-base file:mr-3 file:rounded-lg file:border-0 file:bg-orange-500/20 file:px-3 file:py-1.5 file:font-semibold file:text-orange-100 hover:file:bg-orange-500/30"
           onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
         />
         <button
-          className="nh-button-secondary mt-3 w-full rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="nh-button-secondary mt-3 w-full rounded-xl px-4 py-2.5 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onExtract}
           disabled={loading || authenticating || !file}
         >
           {loading ? 'Extracting...' : 'Extract Data from PDF'}
         </button>
+
+        {previewUrl && (
+          <div className="mt-4 space-y-2">
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-base font-medium text-orange-300 underline-offset-4 hover:underline"
+            >
+              Preview Uploaded Document
+            </a>
+            <iframe
+              title="Uploaded document preview"
+              src={previewUrl}
+              className="h-72 w-full rounded-md border border-orange-200/20 bg-black/30"
+            />
+          </div>
+        )}
       </div>
 
-      <label className="mt-5 block space-y-2 text-sm">
-        <span className="font-medium text-orange-100/90">Recipient Address (Optional)</span>
+      <label className="mt-5 block space-y-3">
+        <span className="text-base font-semibold text-orange-100/90">Recipient Address (Optional)</span>
         <input
-          className="nh-input w-full rounded-xl px-3 py-2 font-mono text-sm"
+          className="nh-input w-full rounded-xl px-3 py-2.5 font-mono text-sm"
           placeholder="0x... (defaults to your wallet)"
           value={recipient}
           onChange={(e) => onRecipientChange(e.target.value)}
         />
       </label>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
-        <label className="space-y-2 text-sm">
-          <span className="font-medium text-orange-100/90">Name</span>
-          <input
-            className="nh-input w-full rounded-xl px-3 py-2"
-            placeholder="Alice Doe"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-          />
-        </label>
-
-        <label className="space-y-2 text-sm">
-          <span className="font-medium text-orange-100/90">Type</span>
-          <input
-            className="nh-input w-full rounded-xl px-3 py-2"
-            placeholder="Refugee ID / Degree / License"
-            value={type}
-            onChange={(e) => onTypeChange(e.target.value)}
-          />
-        </label>
-
-        <label className="space-y-2 text-sm">
-          <span className="font-medium text-orange-100/90">Year</span>
-          <input
-            className="nh-input w-full rounded-xl px-3 py-2"
-            placeholder="2026"
-            value={year}
-            onChange={(e) => onYearChange(e.target.value)}
-          />
-        </label>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {fieldKeys.map((fieldKey) => (
+          <label key={fieldKey} className="space-y-3">
+            <span className="flex items-center gap-2 text-base font-semibold text-orange-100/90">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-orange-400"
+                checked={selectedFieldKeys.includes(fieldKey)}
+                onChange={(event) => onFieldSelectionChange(fieldKey, event.target.checked)}
+              />
+              <span>{formatFieldLabel(fieldKey)}</span>
+            </span>
+            <input
+              className="nh-input w-full rounded-xl px-3 py-2.5 text-base text-orange-50/95"
+              placeholder={formatFieldLabel(fieldKey)}
+              value={extractedFields[fieldKey] ?? ''}
+              readOnly
+              aria-readonly
+            />
+          </label>
+        ))}
       </div>
 
+      <p className="mt-3 text-sm text-orange-100/70">
+        Extracted data fields are read-only. Use checkboxes to choose what goes into the credential.
+      </p>
+
       <button
-        className="nh-button-primary mt-5 rounded-xl px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+        className="nh-button-primary mt-5 rounded-xl px-5 py-2.5 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onIssue}
         disabled={loading || authenticating}
       >

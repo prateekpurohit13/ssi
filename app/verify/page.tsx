@@ -323,13 +323,6 @@ function VerifyPageContent() {
             </div>
           </section>
 
-          {verificationResult && (
-            <section className="nh-panel rounded-lg p-5 sm:p-6">
-              <p className="text-2xl font-bold text-orange-50 sm:text-3xl">Verification Result</p>
-              <p className="mt-2 text-lg text-orange-100/85">{verificationResult}</p>
-            </section>
-          )}
-
           {disclosedData && (
             <section className="nh-panel rounded-lg p-5 sm:p-6">
               <h3 className="text-2xl font-bold text-orange-50 sm:text-3xl">Selectively Disclosed Information</h3>
@@ -410,6 +403,31 @@ function VerifyPageContent() {
           </section>
         </main>
       </div>
+
+      {verificationResult && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="verification-result-title"
+        >
+          <section className="nh-panel w-full max-w-lg rounded-lg p-5 sm:p-6">
+            <p id="verification-result-title" className="text-2xl font-bold text-orange-50 sm:text-3xl">
+              Verification Result
+            </p>
+            <p className="mt-2 text-lg text-orange-100/85">{verificationResult}</p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                className="nh-button-primary rounded-xl px-4 py-2 text-sm font-semibold transition"
+                onClick={() => setVerificationResult(null)}
+              >
+                Close
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

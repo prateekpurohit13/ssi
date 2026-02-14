@@ -6,12 +6,13 @@ import {
   useAccount,
   useChainId,
   useDisconnect,
+  usePublicClient,
   useReadContract,
   useWriteContract,
   useConfig,
 } from 'wagmi'
 import { readContract, waitForTransactionReceipt } from 'wagmi/actions'
-import { isAddress, keccak256, stringToBytes } from 'viem'
+import { formatEther, formatGwei, isAddress, keccak256, stringToBytes } from 'viem'
 import { contractConfig } from '../contract'
 import { trustRegistryConfig } from '../trustRegistry'
 import { interactionHubConfig } from '../interactionHub'
@@ -55,6 +56,18 @@ type AttestationObject = {
   statement?: string
 }
 
+type IssuanceTxDetails = {
+  hash: `0x${string}`
+  blockNumber: bigint
+  confirmations: bigint
+  blockHash: `0x${string}`
+  timestamp: bigint
+  gasUsed: bigint
+  effectiveGasPrice: bigint
+  ethSpent: bigint
+  usdEquivalent?: number
+}
+
 function isAttestationTuple(value: AttestationTuple | AttestationObject): value is AttestationTuple {
   return Array.isArray(value)
 }
@@ -65,6 +78,7 @@ export default function IssuerPage() {
   const { disconnect } = useDisconnect()
   const router = useRouter()
   const config = useConfig()
+  const publicClient = usePublicClient()
   const toast = useToast()
 
   useEffect(() => {
@@ -127,6 +141,7 @@ export default function IssuerPage() {
   const [authenticatingIssue, setAuthenticatingIssue] = useState(false)
   const [authenticatingRevokeHash, setAuthenticatingRevokeHash] = useState<`0x${string}` | null>(null)
   const [requests, setRequests] = useState<ClaimRequestTuple[]>([])
+  const [latestIssuanceTx, setLatestIssuanceTx] = useState<IssuanceTxDetails | null>(null)
 
   useEffect(() => {
     async function loadRequests() {
@@ -316,6 +331,50 @@ export default function IssuerPage() {
       })
 
       await waitForTransactionReceipt(config, { hash: txHash })
+
+      if (publicClient) {
+        const receipt = await publicClient.getTransactionReceipt({ hash: txHash })
+        const [latestBlock, block] = await Promise.all([
+          publicClient.getBlockNumber(),
+          publicClient.getBlock({ blockHash: receipt.blockHash }),
+        ])
+
+        const confirmations = latestBlock >= receipt.blockNumber
+          ? latestBlock - receipt.blockNumber + BigInt(1)
+          : BigInt(0)
+        const ethSpent = receipt.gasUsed * receipt.effectiveGasPrice
+
+        let usdEquivalent: number | undefined
+        try {
+          const priceResponse = await fetch(
+            'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
+          )
+
+          if (priceResponse.ok) {
+            const priceData = (await priceResponse.json()) as {
+              ethereum?: { usd?: number }
+            }
+
+            if (priceData.ethereum?.usd) {
+              usdEquivalent = Number(formatEther(ethSpent)) * priceData.ethereum.usd
+            }
+          }
+        } catch (priceError) {
+          console.warn('Failed to fetch ETH/USD quote', priceError)
+        }
+
+        setLatestIssuanceTx({
+          hash: txHash,
+          blockNumber: receipt.blockNumber,
+          confirmations,
+          blockHash: receipt.blockHash,
+          timestamp: block.timestamp,
+          gasUsed: receipt.gasUsed,
+          effectiveGasPrice: receipt.effectiveGasPrice,
+          ethSpent,
+          usdEquivalent,
+        })
+      }
 
       setExtractedFields({})
       setSelectedFieldKeys([])
@@ -612,6 +671,58 @@ export default function IssuerPage() {
               revokedCredentials={revokedCredentials}
               layout="stack"
             />
+          </section>
+
+          <section className="nh-panel rounded-md p-5 sm:p-6">
+            <h3 className="text-lg font-semibold text-orange-50">Latest Issuance Transaction</h3>
+            {!latestIssuanceTx ? (
+              <p className="mt-2 text-sm nh-text-muted">
+                Issue a credential to view block number, gas usage, confirmations, timestamp, and block hash.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Block Number</p>
+                  <p className="mt-1 font-mono text-orange-50">{latestIssuanceTx.blockNumber.toString()}</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Transaction Confirmations</p>
+                  <p className="mt-1 font-mono text-orange-50">{latestIssuanceTx.confirmations.toString()}</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Timestamp</p>
+                  <p className="mt-1 font-mono text-orange-50">{new Date(Number(latestIssuanceTx.timestamp) * 1000).toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm sm:col-span-2 lg:col-span-3">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Block Hash</p>
+                  <p className="mt-1 truncate font-mono text-orange-50">{latestIssuanceTx.blockHash}</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Gas Used</p>
+                  <p className="mt-1 font-mono text-orange-50">{latestIssuanceTx.gasUsed.toString()}</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Gas Price</p>
+                  <p className="mt-1 font-mono text-orange-50">{formatGwei(latestIssuanceTx.effectiveGasPrice)} Gwei</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">ETH Spent</p>
+                  <p className="mt-1 font-mono text-orange-50">{Number(formatEther(latestIssuanceTx.ethSpent)).toFixed(8)} ETH</p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">USD Equivalent</p>
+                  <p className="mt-1 font-mono text-orange-50">
+                    {typeof latestIssuanceTx.usdEquivalent === 'number'
+                      ? `$${latestIssuanceTx.usdEquivalent.toFixed(2)}`
+                      : 'Unavailable'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-orange-300/20 bg-black/20 p-3 text-sm sm:col-span-2">
+                  <p className="text-xs uppercase tracking-wide text-orange-100/70">Transaction Hash</p>
+                  <p className="mt-1 truncate font-mono text-orange-50">{latestIssuanceTx.hash}</p>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="nh-panel rounded-md p-5 sm:p-6">

@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import ColorBends from './components/home/ColorBends'
@@ -11,12 +12,105 @@ import MagicBento from './components/home/MagicBento'
 export default function Home() {
   const { address } = useAccount()
   const router = useRouter()
+  const pinRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [activeAnalysisIndex, setActiveAnalysisIndex] = useState(0)
+
+  const analysisCards = [
+    {
+      title: 'Blockchain Integrity Layer',
+      points: [
+        'Credential payload hashes are anchored on-chain, while rich metadata lives on IPFS.',
+        'Issuer trust checks run through the trust registry before workflows proceed.',
+        'Revocation state is on-chain, reducing ambiguity during verification.',
+      ],
+    },
+    {
+      title: 'Security Controls',
+      points: [
+        'Wallet signatures gate write operations for issuance, revocation, and interaction events.',
+        'Biometric verification is enforced for sensitive actions through platform authenticators.',
+        'Selective disclosure flows reduce unnecessary data exposure during sharing.',
+      ],
+    },
+    {
+      title: 'Novelty + Feature Depth',
+      points: [
+        'Combines issuance, verification, trust registry, claims, and attestations in one wallet-native flow.',
+        'Supports Merkle batch anchoring for compact proofs across grouped credentials.',
+        'Provides QR-based verification and provenance metadata for each credential card.',
+      ],
+    },
+    {
+      title: 'Scalability and Architecture',
+      points: [
+        'On-chain state remains compact (hashes/status), while documents and JSON scale via IPFS.',
+        'Modular app-router pages separate issuer, verifier, analytics, and interactions responsibilities.',
+        'Contract reads/writes are abstracted with wagmi + viem for predictable wallet/RPC behavior.',
+      ],
+    },
+  ]
+
+  const pinLayout = [
+    { left: '14%', top: '74%' },
+    { left: '33%', top: '40%' },
+    { left: '67%', top: '60%' },
+    { left: '88%', top: '30%' },
+  ]
+
+  const digilockerComparison = [
+    {
+      risk: 'Centralized tamper risk',
+      mitigation:
+        'NeuralHash stores immutable credential fingerprints on-chain, so post-issuance edits become detectable.',
+    },
+    {
+      risk: 'Single trust bottleneck',
+      mitigation:
+        'Issuer trust is explicit and queryable via the trust registry instead of opaque, monolithic trust assumptions.',
+    },
+    {
+      risk: 'Over-disclosure of personal data',
+      mitigation:
+        'Selective claim/disclosure paths share required fields only, limiting broad document exposure.',
+    },
+    {
+      risk: 'Weak auditability of sharing events',
+      mitigation:
+        'Claims, attestations, and status transitions are anchored as verifiable transaction history.',
+    },
+  ]
 
   useEffect(() => {
     if (address) {
       router.push('/choose')
     }
   }, [address, router])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return
+          const target = entry.target as HTMLElement
+          const index = Number(target.dataset.pinIndex)
+          if (!Number.isNaN(index)) {
+            setActiveAnalysisIndex(index)
+          }
+        })
+      },
+      {
+        threshold: 0.72,
+      },
+    )
+
+    pinRefs.current.forEach((pin) => {
+      if (pin) observer.observe(pin)
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-transparent text-orange-50">
@@ -37,21 +131,18 @@ export default function Home() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,138,51,0.16),transparent_36%),radial-gradient(circle_at_80%_72%,rgba(255,106,0,0.2),transparent_32%),linear-gradient(180deg,rgba(2,2,4,0.62)_0%,rgba(2,2,4,0.72)_100%)]" />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <main className="space-y-10">
-          <section className="flex min-h-[70vh] items-center">
+        <main className="space-y-16 sm:space-y-20">
+          <section className="grid min-h-[70vh] items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-3 rounded-2xl border border-orange-300/35 bg-black/25 px-4 py-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-xl border border-orange-300/45 bg-linear-to-br from-orange-500/30 to-orange-700/20">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-orange-200" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="6.5" y="10" width="11" height="9" rx="2" />
-                  <path d="M9 10V7.8a3 3 0 0 1 6 0V10" />
-                  <circle cx="12" cy="14.5" r="0.8" fill="currentColor" stroke="none" />
-                  <path d="M12 15.3v1.5" />
-                  <circle cx="4" cy="12" r="1.2" />
-                  <circle cx="20" cy="12" r="1.2" />
-                  <circle cx="12" cy="3.5" r="1.2" />
-                  <path d="M5.2 12h1.3M17.5 12h1.3M12 4.7V6" />
-                </svg>
+            <div className="inline-flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-orange-300/45 bg-linear-to-br from-orange-500/30 to-orange-700/20">
+                <Image
+                  src="/favicon.ico"
+                  alt="NeuralHash SSI"
+                  width={22}
+                  height={22}
+                  className="h-5 w-5 rounded-sm"
+                />
               </span>
               <span className="font-mono text-base font-bold tracking-[0.16em] text-orange-100/95 sm:text-lg">
                 NeuralHash
@@ -82,6 +173,17 @@ export default function Home() {
             </div>
             <p className="mt-4 text-sm text-orange-100/80 font-mono sm:text-base">Issue credentials securely, store hashes and metadata on-chain + IPFS, and verify authenticity in one flow.</p>
             </div>
+            <div className="relative mx-auto w-full max-w-xl lg:justify-self-end">
+              <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,rgba(255,140,56,0.28),transparent_62%)] blur-2xl" />
+              <Image
+                src="/hero-network.png"
+                alt="NeuralHash connected blockchain network"
+                width={1000}
+                height={1000}
+                priority
+                className="h-auto w-full object-contain"
+              />
+            </div>
           </section>
 
           <section className="space-y-4">
@@ -110,17 +212,185 @@ export default function Home() {
               />
             </div>
 
+            <div className="mt-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-orange-200/85">
+                Product Analysis
+              </p>
+              <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                System review across security, architecture, novelty, and scale
+              </h3>
+              <p className="mt-3 text-sm text-orange-100/80 sm:text-base">
+                This implementation follows a hybrid trust model: blockchain for integrity + state transitions, and IPFS for portable credential payloads.
+                The result is stronger provenance and verification posture than centralized document locker patterns.
+              </p>
+
+              <div className="relative mt-5 -mx-4 sm:-mx-6 lg:-mx-10">
+                <div className="relative h-170 w-full">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,144,63,0.09),transparent_38%),radial-gradient(circle_at_78%_72%,rgba(255,124,32,0.08),transparent_34%)]" />
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="pointer-events-none absolute inset-0 h-full w-full"
+                    aria-hidden="true"
+                  >
+                    <path d="M0,86 C18,20 38,50 54,56 C68,62 80,18 100,22" fill="none" stroke="rgba(255,171,117,0.58)" strokeWidth="0.65" />
+                  </svg>
+
+                  {analysisCards.map((card, index) => {
+                    const isActive = activeAnalysisIndex === index
+                    const position = pinLayout[index]
+
+                    return (
+                      <div
+                        key={card.title}
+                        className="absolute -translate-x-1/2 -translate-y-1/2"
+                        style={{ left: position.left, top: position.top }}
+                      >
+                        <button
+                          ref={(element) => {
+                            pinRefs.current[index] = element
+                          }}
+                          data-pin-index={index}
+                          onMouseEnter={() => setActiveAnalysisIndex(index)}
+                          onFocus={() => setActiveAnalysisIndex(index)}
+                          onClick={() => setActiveAnalysisIndex(index)}
+                          className="group rounded-md border border-orange-300/40 bg-black/45 px-3 py-2 text-left backdrop-blur-sm"
+                          aria-expanded={isActive}
+                          aria-controls={`analysis-pin-panel-${index}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="relative inline-flex h-3.5 w-3.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-300/50" />
+                              <span className="relative inline-flex h-3.5 w-3.5 rounded-full border border-orange-200 bg-orange-300" />
+                            </span>
+                            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-50">
+                              {card.title}
+                            </span>
+                          </div>
+                        </button>
+
+                        <article
+                          id={`analysis-pin-panel-${index}`}
+                          className={`nh-glass mt-3 w-[min(78vw,360px)] rounded-md border border-orange-200/30 bg-black/58 p-3 text-orange-50/95 shadow-[0_14px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl transition-all duration-300 ${
+                            isActive
+                              ? 'pointer-events-auto max-h-80 opacity-100'
+                              : 'pointer-events-none max-h-0 overflow-hidden opacity-0'
+                          }`}
+                        >
+                          <ul className="space-y-2 text-sm text-orange-100/80">
+                            {card.points.map((point) => (
+                              <li key={point} className="flex gap-2">
+                                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-300/80" />
+                                <span>{point}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </article>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-12">
+                <div className="relative mt-6 overflow-hidden rounded-[2.25rem] border border-orange-300/20 bg-black/40 px-6 pb-10 pt-10 sm:px-10 sm:pt-14">
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,rgba(255,60,90,0.28),transparent_64%)]" />
+                  <div className="pointer-events-none absolute left-1/2 top-18 h-168 w-[min(1500px,168vw)] -translate-x-1/2 rounded-full border border-orange-300/25 bg-[radial-gradient(circle_at_50%_100%,rgba(0,0,0,0.82)_44%,rgba(255,54,89,0.12)_80%,rgba(255,54,89,0)_100%)] shadow-[0_0_120px_rgba(255,64,104,0.15)]" />
+
+                  <div className="pointer-events-none absolute left-[8%] top-16 h-1.5 w-1.5 rounded-full bg-orange-200/90" />
+                  <div className="pointer-events-none absolute left-[18%] top-24 h-1 w-1 rounded-full bg-orange-200/70" />
+                  <div className="pointer-events-none absolute right-[14%] top-20 h-1.5 w-1.5 rounded-full bg-orange-200/90" />
+                  <div className="pointer-events-none absolute right-[24%] top-28 h-1 w-1 rounded-full bg-orange-200/70" />
+
+                  <div className="relative z-10">
+                    <p className="mx-auto inline-flex rounded-full border border-orange-300/25 bg-black/45 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-orange-100/85">
+                      Risk Coverage
+                    </p>
+                    <h4 className="mx-auto mt-4 max-w-3xl text-center text-2xl font-black text-white sm:text-3xl">
+                      DigiLocker-style risk comparison and mitigation coverage
+                    </h4>
+                    <p className="mx-auto mt-3 max-w-3xl text-center text-sm text-orange-100/75 sm:text-base">
+                      Compared to centralized locker approaches, this design distributes trust, keeps audit trails tamper-evident,
+                      and minimizes broad data exposure in verification workflows.
+                    </p>
+
+                    <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      {digilockerComparison.map((item) => (
+                        <article
+                          key={item.risk}
+                          className="rounded-2xl border border-orange-300/20 bg-black/45 p-4 backdrop-blur-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-orange-300" />
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-200/90">Risk</p>
+                          </div>
+                          <p className="mt-2 text-sm font-bold text-orange-50">{item.risk}</p>
+                          <p className="mt-3 text-sm leading-relaxed text-orange-100/80">{item.mitigation}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             
           </section>
 
         </main>
 
         <footer className="mt-12 border-t border-orange-300/20 pt-6">
-          <div className="flex flex-col gap-4 text-sm text-orange-100/75 sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              <span className="font-semibold text-orange-200">NeuralHash SSI</span> · Verifiable credentials platform for issuance, trust, and secure verification.
+          <div className="grid gap-5 text-sm text-orange-100/75 md:grid-cols-3">
+            <div>
+              <p>
+                <span className="inline-flex items-center gap-2">
+                  <Image
+                    src="/favicon.ico"
+                    alt="NeuralHash SSI"
+                    width={16}
+                    height={16}
+                    className="h-4 w-4 rounded-[3px]"
+                  />
+                  <span className="font-semibold text-orange-200">NeuralHash SSI</span>
+                </span>{' '}
+                · Verifiable credentials platform for issuance, trust, and secure verification.
+              </p>
+              <p className="mt-2 text-orange-100/70">
+                Designed for tamper-evident provenance, portable credentials, and wallet-centric identity control.
+              </p>
+            </div>
+
+            <div>
+              <p className="font-semibold text-orange-200">Architecture + Stack</p>
+              <ul className="mt-2 space-y-1 text-orange-100/70">
+                <li>Next.js App Router + TypeScript UI</li>
+                <li>wagmi + viem for contract I/O</li>
+                <li>IPFS/Pinata for credential metadata and file storage</li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="font-semibold text-orange-200">Security Posture</p>
+              <ul className="mt-2 space-y-1 text-orange-100/70">
+                <li>On-chain hash anchoring and revocation visibility</li>
+                <li>Trust registry checks for issuer reputation</li>
+                <li>Biometric gating for sensitive user actions</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 border-t border-orange-300/15 pt-4 text-xs text-orange-100/65 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-mono inline-flex items-center gap-2">
+              <Image
+                src="/favicon.ico"
+                alt="NeuralHash SSI"
+                width={14}
+                height={14}
+                className="h-3.5 w-3.5 rounded-[3px]"
+              />
+              <span>© 2026 NeuralHash SSI · Built for decentralized identity workflows</span>
             </p>
-            <p className="font-mono">© 2026 NeuralHash SSI · Built for decentralized identity workflows</p>
+            <p>Hybrid model: decentralized integrity + scalable off-chain document delivery</p>
           </div>
         </footer>
       </div>

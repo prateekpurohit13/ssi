@@ -1,7 +1,7 @@
 # NeuralHash SSI
 
 <p align="center">
-	<img src="public/NeuralHash.png" alt="NeuralHash SSI Favicon" width="64" height="64" />
+	<img src="public/NeuralHash.png" alt="NeuralHash SSI Favicon" width="256" height="256" />
 </p>
 
 > **The HTTPS layer for Global Identity.** A Self-Sovereign Identity protocol — recoverable, verifiable, and tamper-proof.
